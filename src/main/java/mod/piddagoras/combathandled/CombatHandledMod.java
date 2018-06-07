@@ -1,7 +1,14 @@
 package mod.piddagoras.combathandled;
 
 import com.wurmonline.server.items.Materials;
+import javassist.ClassPool;
+import javassist.CtClass;
+import javassist.NotFoundException;
+import javassist.bytecode.Descriptor;
 import mod.sin.lib.Prop;
+import mod.sin.lib.Util;
+import org.gotti.wurmunlimited.modloader.classhooks.HookException;
+import org.gotti.wurmunlimited.modloader.classhooks.HookManager;
 import org.gotti.wurmunlimited.modloader.interfaces.*;
 
 import java.util.Properties;
@@ -50,7 +57,7 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
                 e.printStackTrace();
             }
         }
-        // Print values of main.java.armoury.mod configuration
+        // Print values of configuration
         logger.info(" -- Mod Configuration -- ");
         //logger.log(Level.INFO, "enableNonPlayerCrits: " + enableNonPlayerCrits);
         logger.info(" -- Configuration complete -- ");
@@ -59,7 +66,33 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	@Override
 	public void preInit(){
 		logger.info("Beginning preInit...");
-	}
+        try{
+            ClassPool classPool = HookManager.getInstance().getClassPool();
+            final Class<CombatHandledMod> thisClass = CombatHandledMod.class;
+            String replace;
+
+		    Util.setReason("Debug attack method");
+            CtClass ctCombatHandler = classPool.get("com.wurmonline.server.creatures.CombatHandler");
+            CtClass ctCreature = classPool.get("com.wurmonline.server.creatures.Creature");
+            CtClass ctAction = classPool.get("com.wurmonline.server.behaviours.Action");
+            CtClass[] params4 = {
+                    ctCreature,
+                    CtClass.intType,
+                    CtClass.booleanType,
+                    CtClass.floatType,
+                    ctAction
+            };
+            String desc4 = Descriptor.ofMethod(CtClass.booleanType, params4);
+            replace = "{" +
+                    CombatHandled.class.getName()+".attackLoop($0.creature, $1, $2, $3, $4, $5);" +
+                    "logger.info(\"attacker = \"+$0.creature.getName()+\", opponent = \"+$1.getName()+\", combatCounter = \"+$2+\", opportunity = \"+$3+\", actionCounter = \"+$4);" +
+                    "}";
+            Util.setBodyDescribed(thisClass, ctCombatHandler, "attack", desc4, replace);
+
+        } catch ( NotFoundException | IllegalArgumentException | ClassCastException e) {
+            throw new HookException(e);
+        }
+    }
 	
 	@Override
 	public void onItemTemplatesCreated(){

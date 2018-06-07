@@ -10,13 +10,17 @@ import com.wurmonline.server.creatures.AttackAction;
 import com.wurmonline.server.creatures.CombatHandler;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.items.Item;
+import com.wurmonline.server.items.Materials;
 import com.wurmonline.server.players.ItemBonus;
 import com.wurmonline.server.players.Player;
 import com.wurmonline.server.skills.NoSuchSkillException;
 import com.wurmonline.server.skills.Skill;
 import com.wurmonline.server.utils.CreatureLineSegment;
+import com.wurmonline.shared.constants.Enchants;
 import com.wurmonline.shared.util.MulticolorLineSegment;
+import org.gotti.wurmunlimited.modloader.ReflectionUtil;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -113,8 +117,8 @@ public class CombatHandled{
     protected boolean turned = false;
 
 
-    protected static final List<ActionEntry> selectStanceList = new LinkedList();
-    private static final List<ActionEntry> standardDefences = new LinkedList();
+    protected static final List<ActionEntry> selectStanceList = new LinkedList<>();
+    private static final List<ActionEntry> standardDefences = new LinkedList<>();
 
 
     protected static double manouvreMod = 0.0D;
@@ -159,7 +163,13 @@ public class CombatHandled{
             }
             if (CombatHandler.prerequisitesFail(attacker, opponent, opportunity, weapon)) return true;
             if (act != null && act.justTickedSecond()) {
-                attacker.getCommunicator().sendCombatStatus(CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
+                //attacker.getCommunicator().sendCombatStatus(CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
+                try {
+                    // Using ReflectionUtil to call a protected method with arguments.
+                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
+                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    e.printStackTrace();
+                }
             }
             if (this.isProne() || this.isOpen()) return false;
 
@@ -349,26 +359,33 @@ public class CombatHandled{
             if (!miss && !crit) {
                 boolean keepGoing = true;
                 double defCheck = (double)(Server.rand.nextFloat() * 100.0F) * combatMap.get(opponent).getDodgeMod();
-                defCheck *= (double)opponent.getStatus().getDodgeTypeModifier();
-                if (opponent.getMovePenalty() != 0) {
-                    defCheck *= (double)(1.0F + (float)opponent.getMovePenalty() / 10.0F);
-                }
-
-                defCheck *= 1.0D - opponent.getMovementScheme().armourMod.getModifier();
-                if (defCheck < opponent.getBodyControl() / 3.0D) {
-                    if ((double)(opponent.getStatus().getDodgeTypeModifier() * 100.0F) < opponent.getBodyControl() / 3.0D) {
-                        logger.log(Level.WARNING, opponent.getName() + " is impossible to hit except for crits: " + combatMap.get(opponent).getDodgeMod() * 100.0D + " is always less than " + opponent.getBodyControl());
+                //defCheck *= (double)opponent.getStatus().getDodgeTypeModifier();
+                try {
+                    // Using ReflectionUtil to call a protected method to obtain a value.
+                    float opponentDodgeTypeModifier = ReflectionUtil.callPrivateMethod(opponent.getStatus(), ReflectionUtil.getMethod(opponent.getStatus().getClass(), "getDodgeTypeModifier"));
+                    defCheck *= (double)opponentDodgeTypeModifier;
+                    if (opponent.getMovePenalty() != 0) {
+                        defCheck *= (double)(1.0F + (float)opponent.getMovePenalty() / 10.0F);
                     }
 
-                    this.sendDodgeMessage(opponent);
-                    keepGoing = false;
-                    String dodgeDetails = "Dodge=" + defCheck + "<" + opponent.getBodyControl() / 3.0D + " dodgemod=" + combatMap.get(opponent).getDodgeMod() + " dodgeType=" + opponent.getStatus().getDodgeTypeModifier() + " dodgeMovePenalty=" + opponent.getMovePenalty() + " armour=" + opponent.getMovementScheme().armourMod.getModifier();
-                    if (attacker.spamMode() && Servers.isThisATestServer()) {
-                        attacker.getCommunicator().sendCombatSafeMessage(dodgeDetails);
-                    }
+                    defCheck *= 1.0D - opponent.getMovementScheme().armourMod.getModifier();
+                    if (defCheck < opponent.getBodyControl() / 3.0D) {
+                        if ((double)(opponentDodgeTypeModifier * 100.0F) < opponent.getBodyControl() / 3.0D) {
+                            logger.log(Level.WARNING, opponent.getName() + " is impossible to hit except for crits: " + combatMap.get(opponent).getDodgeMod() * 100.0D + " is always less than " + opponent.getBodyControl());
+                        }
 
-                    attacker.sendToLoggers(dodgeDetails, (byte)4);
-                    checkIfHitVehicle(attacker, opponent);
+                        this.sendDodgeMessage(opponent);
+                        keepGoing = false;
+                        String dodgeDetails = "Dodge=" + defCheck + "<" + opponent.getBodyControl() / 3.0D + " dodgemod=" + combatMap.get(opponent).getDodgeMod() + " dodgeType=" + opponentDodgeTypeModifier + " dodgeMovePenalty=" + opponent.getMovePenalty() + " armour=" + opponent.getMovementScheme().armourMod.getModifier();
+                        if (attacker.spamMode() && Servers.isThisATestServer()) {
+                            attacker.getCommunicator().sendCombatSafeMessage(dodgeDetails);
+                        }
+
+                        attacker.sendToLoggers(dodgeDetails, (byte)4);
+                        checkIfHitVehicle(attacker, opponent);
+                    }
+                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    e.printStackTrace();
                 }
 
                 if (keepGoing) {
@@ -396,11 +413,11 @@ public class CombatHandled{
                 if (!attacker.isUnique() && attCheck - (double)chanceToHit > 50.0D && Server.rand.nextInt(10) == 0) {
                     justOpen = true;
                     this.setCurrentStance(-1, (byte)9);
-                    ArrayList<MulticolorLineSegment> segments = new ArrayList();
+                    ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                     segments.add(new CreatureLineSegment(attacker));
                     segments.add(new MulticolorLineSegment(" makes a bad move and is an easy target!.", (byte)0));
                     opponent.getCommunicator().sendColoredMessageCombat(segments);
-                    ((MulticolorLineSegment)segments.get(1)).setText(" make a bad move, making you an easy target.");
+                    segments.get(1).setText(" make a bad move, making you an easy target.");
                     attacker.getCommunicator().sendColoredMessageCombat(segments);
                     attacker.getCurrentTile().checkOpportunityAttacks(attacker);
                     opponent.getCurrentTile().checkOpportunityAttacks(attacker);
@@ -424,7 +441,7 @@ public class CombatHandled{
         double defBonus = (double)(opponent.zoneBonus - (float)opponent.getMovePenalty());
         attBonus += (double)CombatEngine.getEnchantBonus(weapon, opponent);
         if (this.addToSkills && opponent.isPlayer() && combatMap.get(opponent).currentStrength == 0) {
-            Skill def = null;
+            Skill def;
 
             try {
                 def = opponent.getSkills().getSkill(10054);
@@ -465,8 +482,18 @@ public class CombatHandled{
         }
 
         parryBonus = this.getParryBonus(combatMap.get(opponent).currentStance, this.currentStance);
-        if (opponent.fightlevel > 0) {
+
+        /*if (opponent.fightevel> 0) {
             parryBonus -= (float)(opponent.fightlevel) / 100.0F;
+        }*/
+        try {
+            // Using ReflectionUtil to get private field "fightlevel"
+            byte opponentFightLevel = ReflectionUtil.getPrivateField(opponent, ReflectionUtil.getField(opponent.getClass(), "fightlevel"));
+            if (opponentFightLevel> 0) {
+                parryBonus -= (float)(opponentFightLevel) / 100.0F;
+            }
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            e.printStackTrace();
         }
 
         double m = 1.0D;
@@ -490,7 +517,9 @@ public class CombatHandled{
 
     //Copy pasta
     public byte getType(Creature attacker, Item weapon, boolean rawType) {
-        byte woundType = attacker.getCombatDamageType();
+        //byte woundType = attacker.getCombatDamageType();
+        // getCombatDamageType() calls template.getCombatDamageType(). This call is identical and not private.
+        byte woundType = attacker.getTemplate().getCombatDamageType();
         if (!weapon.isWeaponSword() && weapon.getTemplateId() != 706) {
             if (weapon.getTemplateId() == 1115) {
                 if (!rawType && Server.rand.nextInt(3) != 0) {
@@ -520,8 +549,8 @@ public class CombatHandled{
         return woundType;
     }
     //Copy pasta
-    private final double getDamage(Creature attacker, Item weapon, Creature opponent) {
-        Skill attStrengthSkill = null;
+    private double getDamage(Creature attacker, Item weapon, Creature opponent) {
+        Skill attStrengthSkill;
         double damage;
         try {
             attStrengthSkill = attacker.getSkills().getSkill(102);
@@ -531,7 +560,15 @@ public class CombatHandled{
         }
 
         if (weapon.isBodyPartAttached()) {
-            damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F * attacker.getStatus().getDamageTypeModifier());
+            //damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F * attacker.getStatus().getDamageTypeModifier());
+            try {
+                // Using ReflectionUtil to call a protected method to adjust a variable.
+                float attackerDamageTypeModifier = ReflectionUtil.callPrivateMethod(attacker.getStatus(), ReflectionUtil.getMethod(attacker.getStatus().getClass(), "getDamageTypeModifier"));
+                damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F * attackerDamageTypeModifier);
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F); // Assume it's 1.0F in the case that the reflection fails.
+                e.printStackTrace();
+            }
             if (attacker.isPlayer()) {
                 Skill weaponLess = attacker.getWeaponLessFightingSkill();
                 double modifier = 1.0D + 2.0D * weaponLess.getKnowledge() / 100.0D;
@@ -563,17 +600,17 @@ public class CombatHandled{
         }
 
         if (attacker.getEnemyPresense() > 1200 && opponent.isPlayer() && !weapon.isArtifact()) {
-            damage *= 1.149999976158142D;
+            damage *= 1.15D;
         }
 
         if (!weapon.isArtifact() && this.hasRodEffect && opponent.isPlayer()) {
-            damage *= 1.2000000476837158D;
+            damage *= 1.2D;
         }
 
         Vehicle vehicle = Vehicles.getVehicleForId(opponent.getVehicle());
         boolean mildStack = false;
         if (weapon.isWeaponPolearm() && (vehicle != null && vehicle.isCreature() || opponent.isRidden() && weapon.isWeaponPierce())) {
-            damage *= 1.7000000476837158D;
+            damage *= 1.7D;
         } else if (weapon.isArtifact()) {
             mildStack = true;
         } else if (attacker.getCultist() != null && attacker.getCultist().doubleWarDamage()) {
@@ -590,7 +627,7 @@ public class CombatHandled{
             }
 
             if (this.currentStrength == 0) {
-                Skill fstyle = null;
+                Skill fstyle;
 
                 try {
                     fstyle = attacker.getSkills().getSkill(10054);
@@ -600,7 +637,7 @@ public class CombatHandled{
 
                 if (fstyle.skillCheck((double)(opponent.getBaseCombatRating() * 3.0F), 0.0D, this.receivedFStyleSkill || opponent.isNoSkillFor(attacker), 10.0F, attacker, opponent) > 0.0D) {
                     this.receivedFStyleSkill = true;
-                    damage *= 0.800000011920929D;
+                    damage *= 0.8D;
                 } else {
                     damage *= 0.5D;
                 }
@@ -646,7 +683,7 @@ public class CombatHandled{
         }
 
         if (attacker.isStealth() && attacker.opponent != null && !attacker.isVisibleTo(opponent)) {
-            ArrayList<MulticolorLineSegment> segments = new ArrayList();
+            ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
             segments.add(new CreatureLineSegment(attacker));
             segments.add(new MulticolorLineSegment(" backstab ", (byte)0));
             segments.add(new CreatureLineSegment(opponent));
@@ -658,8 +695,18 @@ public class CombatHandled{
             damage *= (double)(1.0F + attacker.getCitizenVillage().getFaithWarBonus() / 100.0F);
         }
 
-        if (attacker.fightlevel >= 4) {
+        /*if (attacker.fightlevel >= 4) {
             damage *= 1.100000023841858D;
+        }*/
+
+        try {
+            // Using ReflectionUtil to access private field "fightlevel" and cleaning up the decompiler's floating point error.
+            byte attackerFightLevel = ReflectionUtil.getPrivateField(attacker, ReflectionUtil.getField(attacker.getClass(), "fightlevel"));
+            if(attackerFightLevel >= 4){
+                damage *= 1.1D;
+            }
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            e.printStackTrace();
         }
 
         return damage;
@@ -678,8 +725,17 @@ public class CombatHandled{
         }
 
         parryBonus = getParryBonus(combatMap.get(defender).currentStance, this.currentStance);
-        if (defender.fightlevel > 0) {
+        /*if (defender.fightlevel > 0) {
             parryBonus -= (float)(defender.fightlevel * 4) / 100.0F;
+        }*/
+
+        try {
+            byte defenderFightLevel = ReflectionUtil.getPrivateField(defender, ReflectionUtil.getField(defender.getClass(), "fightlevel"));
+            if(defenderFightLevel > 0){
+                parryBonus -= (float)(defenderFightLevel * 4) / 100.0F;
+            }
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            e.printStackTrace();
         }
 
         if (defender.getPrimWeapon() != null) {
@@ -739,7 +795,14 @@ public class CombatHandled{
                         setDefenderWeaponSkill(defLeftWeapon);
                         if (!defender.isMoving() || defPrimWeaponSkill.getRealKnowledge() > 40.0D) {
                             pdiff = Math.max(1.0D, (attCheck - defBonus + (double)((float)defLeftWeapon.getWeightGrams() / 100.0F)) / (double)getWeaponParryBonus(defLeftWeapon) * this.getParryMod());
-                            pdiff *= (double)defender.getStatus().getParryTypeModifier();
+                            //pdiff *= (double)defender.getStatus().getParryTypeModifier();
+                            try {
+                                // Using ReflectionUtil to call a protected method for variable adjustments.
+                                float defenderParryTypeModifier = ReflectionUtil.callPrivateMethod(defender.getStatus(), ReflectionUtil.getMethod(defender.getStatus().getClass(), "getParryTypeModifier"));
+                                pdiff *= (double)defenderParryTypeModifier;
+                            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                                e.printStackTrace();
+                            }
                             defCheck = defPrimWeaponSkill.skillCheck(pdiff * (double)ItemBonus.getParryBonus(defender, defParryWeapon), defLeftWeapon, 0.0D, this.creature.isNoSkillFor(defender) || defParryWeapon.isWeaponBow(), 1.0F, defender, this.creature);
                             defender.lastParry = WurmCalendar.currentTime;
                             defender.getStatus().modifyStamina(-300.0F);
@@ -787,8 +850,17 @@ public class CombatHandled{
                 catch (NoSuchSkillException nss) {
                     bcskill = attacker.getSkills().learn(104, 1.0f);
                 }
-                if (bcskill.skillCheck(Math.abs(Math.max(Math.min(steepness[1], 99), -99)), attacker.fightlevel * 10, true, 1.0f) > 0.0) {
+                /*if (bcskill.skillCheck(Math.abs(Math.max(Math.min(steepness[1], 99), -99)), attacker.fightlevel * 10, true, 1.0f) > 0.0) {
                     return 1.0f + footingMod;
+                }*/
+                try {
+                    // Using ReflectionUtil to get private field "fightlevel"
+                    byte attackerFightLevel = ReflectionUtil.getPrivateField(attacker, ReflectionUtil.getField(attacker.getClass(), "fightlevel"));
+                    if (bcskill.skillCheck(Math.abs(Math.max(Math.min(steepness[1], 99), -99)), attackerFightLevel * 10, true, 1.0f) > 0.0) {
+                        return 1.0f + footingMod;
+                    }
+                } catch (IllegalAccessException | NoSuchFieldException e) {
+                    e.printStackTrace();
                 }
                 if (steepness[1] > 40 || steepness[1] < -40) {
                     if (steepness[1] > 60 || steepness[1] < -60) {
@@ -820,27 +892,28 @@ public class CombatHandled{
         if (weapon.getSpellSpeedBonus() != 0.0f) {
             calcspeed = (float)((double)calcspeed - 0.5 * (double)(weapon.getSpellSpeedBonus() / 100.0f));
         }
-        if (!weapon.isArtifact() && attacker.getBonusForSpellEffect((byte) 39) > 0.0f) {
+        if (!weapon.isArtifact() && attacker.getBonusForSpellEffect(Enchants.CRET_CHARGE) > 0.0f) {
             calcspeed -= 0.5f; //Frantic Charge
         }
         if (weapon.isTwoHanded() && this.currentStrength == 3) {
             calcspeed *= 0.9f; //Aggressive stance
         }
-        if (!Features.Feature.METALLIC_ITEMS.isEnabled() && weapon.getMaterial() == 57) {
+        if (!Features.Feature.METALLIC_ITEMS.isEnabled() && weapon.getMaterial() == Materials.MATERIAL_GLIMMERSTEEL) {
             calcspeed *= 0.9f; //Glimmersteel
         }
         if (attacker.getStatus().getStamina() < 2000) {
             calcspeed += 1.0f; //Low Stamina
         }
         calcspeed = (float)((double)calcspeed - attacker.getMovementScheme().getWebArmourMod() * 10.0);//Don't understand this.
-        if (attacker.hasSpellEffect((byte) 66)) {
-            calcspeed *= 2.0f; //Web armor
+        //if (attacker.hasSpellEffect((byte) 66)) {
+        if (attacker.hasSpellEffect(Enchants.CRET_KARMASLOW)) {
+            calcspeed *= 2.0f; //Karma Slow
         }
         return Math.max(2.0f, calcspeed);
     }
     //Copy pasta
     protected float getWeaponSpeed(Creature attacker, Item _weapon) {
-        float flspeed = 20.0f;
+        float flspeed;
         float knowl = 0.0f;
         int spskillnum = 10052;
         if (_weapon.isBodyPartAttached()) {
@@ -936,7 +1009,8 @@ public class CombatHandled{
         }
 
         if (attacker.getPrimWeapon().isBodyPartAttached()) {
-            knowl += attacker.getBonusForSpellEffect((byte)24) / 5.0F;
+            // Bearpaws
+            knowl += attacker.getBonusForSpellEffect(Enchants.CRET_BEARPAW) / 5.0F;
         }
 
         Seat s = attacker.getSeat();
@@ -953,8 +1027,7 @@ public class CombatHandled{
     //Copy pasta
     private float getAlcMod(Creature attacker) {
         if (attacker.isPlayer()) {
-            float alc = 0.0F;
-            alc = ((Player)attacker).getAlcohol();
+            float alc = ((Player)attacker).getAlcohol();
             return alc < 20.0F ? (100.0F + alc) / 100.0F : Math.max(40.0F, 100.0F - alc) / 80.0F;
         } else {
             return 1.0F;
@@ -1221,31 +1294,31 @@ public class CombatHandled{
         return this.currentStance == 8;
     }
     //Copy pasta
-    public static final boolean isHigh(int stance) {
+    public static boolean isHigh(int stance) {
         return stance == 6 || stance == 1 || stance == 7;
     }
     //Copy pasta
-    public static final boolean isLow(int stance) {
+    public static boolean isLow(int stance) {
         return stance == 4 || stance == 3 || stance == 10 || stance == 8;
     }
     //Copy pasta
-    public static final boolean isLeft(int stance) {
+    public static boolean isLeft(int stance) {
         return stance == 4 || stance == 5 || stance == 6;
     }
     //Copy pasta
-    public static final boolean isRight(int stance) {
+    public static boolean isRight(int stance) {
         return stance == 3 || stance == 2 || stance == 1 || stance == 11;
     }
     //Copy pasta
-    public static final boolean isCenter(int stance) {
+    public static boolean isCenter(int stance) {
         return stance == 0 || stance == 9 || stance == 13 || stance == 14 || stance == 12;
     }
     //Copy pasta
-    public static final boolean isDefend(int stance) {
+    public static boolean isDefend(int stance) {
         return stance == 13 || stance == 14 || stance == 12 || stance == 11;
     }
     //Copy pasta
-    protected static final byte getStanceForAction(ActionEntry entry) {
+    protected static byte getStanceForAction(ActionEntry entry) {
         if (entry.isAttackHigh()) {
             if (entry.isAttackLeft()) {
                 return 6;
@@ -1290,7 +1363,7 @@ public class CombatHandled{
         return 0;
     }
     //Copy pasta
-    protected static final ActionEntry getDefensiveActionEntry(byte opponentStance) {
+    protected static ActionEntry getDefensiveActionEntry(byte opponentStance) {
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
@@ -1300,7 +1373,7 @@ public class CombatHandled{
         return null;
     }
     //Copy pasta
-    protected static final ActionEntry getOpposingActionEntry(byte opponentStance) {
+    protected static ActionEntry getOpposingActionEntry(byte opponentStance) {
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
@@ -1310,7 +1383,7 @@ public class CombatHandled{
         return null;
     }
     //Copy pasta
-    protected static final ActionEntry getNonDefensiveActionEntry(byte opponentStance) {
+    protected static ActionEntry getNonDefensiveActionEntry(byte opponentStance) {
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
@@ -1320,7 +1393,7 @@ public class CombatHandled{
         return null;
     }
     //Copy pasta
-    public static final boolean isStanceParrying(byte defenderStance, byte attackerStance) {
+    public static boolean isStanceParrying(byte defenderStance, byte attackerStance) {
         if (attackerStance != 8 && attackerStance != 9) {
             if (defenderStance != 8 && defenderStance != 9) {
                 if (defenderStance == 11) {
@@ -1342,7 +1415,7 @@ public class CombatHandled{
         }
     }
     //Copy pasta
-    public static final boolean isStanceOpposing(byte defenderStance, byte attackerStance) {
+    public static boolean isStanceOpposing(byte defenderStance, byte attackerStance) {
         if (attackerStance != 8 && attackerStance != 9) {
             if (defenderStance != 8 && defenderStance != 9) {
                 if (defenderStance == 1) {
@@ -1374,7 +1447,7 @@ public class CombatHandled{
         }
     }
     //Copy pasta
-    public static final float getMoveChance(Creature performer, @Nullable Item weapon, int stance, ActionEntry entry, float mycr, float oppcr, float primweaponskill) {
+    public static float getMoveChance(Creature performer, @Nullable Item weapon, int stance, ActionEntry entry, float mycr, float oppcr, float primweaponskill) {
         float basechance = 100.0F - oppcr * 2.0F + mycr + primweaponskill;
         float cost = 0.0F;
         if (isHigh(stance)) {
@@ -1434,14 +1507,23 @@ public class CombatHandled{
             cost += Weapon.getBaseSpeedForWeapon(weapon);
         }
 
-        if (performer.fightlevel >= 2) {
+        /*if (performer.fightlevel >= 2) {
             cost -= 10.0F;
+        }*/
+        try {
+            // Using ReflectionUtil to get private field "fightlevel"
+            byte performerFightLevel = ReflectionUtil.getPrivateField(performer, ReflectionUtil.getField(performer.getClass(), "fightlevel"));
+            if (performerFightLevel >= 2) {
+                cost -= 10.0F;
+            }
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            e.printStackTrace();
         }
 
         return Math.min(100.0F, Math.max(0.0F, basechance - cost));
     }
     //Copy pasta
-    protected static final int getAttackSkillCap(short action) {
+    protected static int getAttackSkillCap(short action) {
         switch (action) {
             case 303: {
                 return 0;
@@ -1474,7 +1556,7 @@ public class CombatHandled{
         return 0;
     }
     //Copy pasta
-    protected static final boolean isNextGoodStance(byte currentStance, byte nextStance, byte opponentStance) {
+    protected static boolean isNextGoodStance(byte currentStance, byte nextStance, byte opponentStance) {
         if (CombatHandled.isAtSoftSpot(nextStance, opponentStance)) {
             return false;
         }
@@ -1502,7 +1584,7 @@ public class CombatHandled{
         return false;
     }
     //Copy pasta
-    protected static final boolean isAtSoftSpot(byte stanceChecked, byte stanceUnderAttack) {
+    protected static boolean isAtSoftSpot(byte stanceChecked, byte stanceUnderAttack) {
         byte[] opponentSoftSpots;
         for (byte spot : opponentSoftSpots = CombatHandled.getSoftSpots(stanceChecked)) {
             if (spot != stanceUnderAttack) continue;
@@ -1511,7 +1593,7 @@ public class CombatHandled{
         return false;
     }
     //Copy pasta
-    protected static final byte[] getSoftSpots(byte currentStance) {
+    protected static byte[] getSoftSpots(byte currentStance) {
         if (currentStance == 0) {
             return standardSoftSpots;
         }
@@ -1536,7 +1618,7 @@ public class CombatHandled{
         return emptyByteArray;
     }
     //Copy pasta;  It appears as though isNextGoodStance calls in this method uses wrong argument order.
-    protected static final boolean existsBetterOffensiveStance(byte _currentStance, byte opponentStance) {
+    protected static boolean existsBetterOffensiveStance(byte _currentStance, byte opponentStance) {
         if (CombatHandled.isAtSoftSpot(opponentStance, _currentStance)) {
             return false;
         }
@@ -1561,7 +1643,7 @@ public class CombatHandled{
         return false;
     }
     //Copy pasta;  It appears as though isNextGoodStance calls in this method uses wrong argument order.
-    protected static final ActionEntry changeToBestOffensiveStance(byte _currentStance, byte opponentStance) {
+    protected static ActionEntry changeToBestOffensiveStance(byte _currentStance, byte opponentStance) {
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
@@ -1572,7 +1654,7 @@ public class CombatHandled{
         return null;
     }
     //Copy pasta
-    protected static final float getDistdiff(Creature creature, Creature opponent, AttackAction atk) {
+    protected static float getDistdiff(Creature creature, Creature opponent, AttackAction atk) {
         if (atk != null && !atk.isUsingWeapon()) {
             float idealDist = 10 + atk.getAttackValues().getAttackReach() * 3;
             float dist = Creature.rangeToInDec(creature, opponent);
@@ -1582,7 +1664,7 @@ public class CombatHandled{
         return CombatHandled.getDistdiff(wpn, creature, opponent);
     }
     //Copy pasta
-    protected static final float getDistdiff(Item weapon, Creature creature, Creature opponent) {
+    protected static float getDistdiff(Item weapon, Creature creature, Creature opponent) {
         float idealDist = (float)(10 + Weapon.getReachForWeapon(weapon) * 3);
         float dist = Creature.rangeToInDec(creature, opponent);
         return idealDist - dist;
@@ -1707,7 +1789,7 @@ public class CombatHandled{
                     num = 10055;
                 }
 
-                Skill def = null;
+                Skill def;
 
                 try {
                     def = attacker.getSkills().getSkill(num);
@@ -1720,7 +1802,7 @@ public class CombatHandled{
                 }
             }
         } else if (attacker.isPlayer() && this.currentStrength > 1) {
-            Skill def = null;
+            Skill def;
 
             try {
                 def = attacker.getSkills().getSkill(10053);
@@ -1758,8 +1840,17 @@ public class CombatHandled{
         }
 
         combatRating *= crmod;
-        if (attacker.fightlevel >= 3) {
+        /*if (attacker.fightlevel >= 3) {
             combatRating += (float)(attacker.fightlevel * 2);
+        }*/
+        try {
+            // Using ReflectionUtil to get private field "fightlevel"
+            byte attackerFightLevel = ReflectionUtil.getPrivateField(attacker, ReflectionUtil.getField(attacker.getClass(), "fightlevel"));
+            if (attackerFightLevel >= 3) {
+                combatRating += (float)(attackerFightLevel * 2);
+            }
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            e.printStackTrace();
         }
 
         if (attacker.isPlayer()) {
