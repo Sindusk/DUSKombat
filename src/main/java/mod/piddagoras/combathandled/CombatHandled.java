@@ -123,7 +123,7 @@ new ActionEntry(316, 8, "Low", "defending", new int[]{16}, 6, false),
 new ActionEntry(317, 8, "Right", "defending", new int[]{16}, 6, false)
 */
 public class CombatHandled{
-    /*public static HashMap<Creature, CombatHandled> combatMap = new HashMap<>();
+    public static HashMap<Creature, CombatHandled> combatMap = new HashMap<>();
 
     public static boolean attack(Creature attacker, Creature opponent, int combatCounter, boolean opportunity, float actionCounter, Action act) {
         if(combatMap.containsKey(attacker)){
@@ -846,5 +846,5 @@ public class CombatHandled{
         }
         Item wpn = creature.getPrimWeapon();
         return CombatHandled.getDistdiff(wpn, creature, opponent);
-    }*/
+    }
 }
