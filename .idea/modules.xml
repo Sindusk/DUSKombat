@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/CombatHandled.iml" filepath="$PROJECT_DIR$/CombatHandled.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/CombatHandled_main.iml" filepath="$PROJECT_DIR$/.idea/modules/CombatHandled_main.iml" group="CombatHandled" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/CombatHandled_test.iml" filepath="$PROJECT_DIR$/.idea/modules/CombatHandled_test.iml" group="CombatHandled" />
+    </modules>
+  </component>
+</project>
