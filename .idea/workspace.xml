@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="b44ee5ac-96bd-4eec-9d40-7b8993764384" name="Default" comment="" />
+    <list default="true" id="b44ee5ac-96bd-4eec-9d40-7b8993764384" name="Default" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java" afterDir="false" />
+    </list>
     <ignored path="$PROJECT_DIR$/.gradle/" />
     <ignored path="$PROJECT_DIR$/build/" />
     <ignored path="$PROJECT_DIR$/out/" />
@@ -28,18 +31,7 @@
             <expand>
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="Armoury" type="f1a62948:ProjectNode" />
-              </path>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="Armoury" type="f1a62948:ProjectNode" />
-                <item name="Tasks" type="e4a08cd1:TasksNode" />
-              </path>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="Armoury" type="f1a62948:ProjectNode" />
-                <item name="Tasks" type="e4a08cd1:TasksNode" />
-                <item name="other" type="c8890929:TasksNode$1" />
+                <item name="CombatHandled" type="f1a62948:ProjectNode" />
               </path>
             </expand>
             <select />
@@ -50,46 +42,114 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="build.gradle" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/build.gradle">
+      <file leaf-file-name="CombatHandled.java" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="204">
-              <caret line="12" column="31" selection-start-line="12" selection-start-column="31" selection-end-line="12" selection-end-column="31" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="CombatTweaks.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1105">
-              <caret line="65" column="21" selection-start-line="65" selection-start-column="21" selection-end-line="65" selection-end-column="21" />
+            <state relative-caret-position="528">
+              <caret line="59" column="29" lean-forward="true" selection-start-line="59" selection-start-column="29" selection-end-line="59" selection-end-column="29" />
               <folding>
-                <element signature="imports" expanded="true" />
+                <element signature="e#4030#4561#0" />
+                <element signature="e#6434#14535#0" />
+                <element signature="e#24683#26127#0" />
+                <element signature="e#26135#27437#0" />
+                <element signature="e#26231#26281#0" />
+                <element signature="e#27442#34805#0" />
+                <element signature="e#34812#40444#0" />
+                <element signature="e#40449#42848#0" />
+                <element signature="e#42856#45351#0" />
+                <element signature="e#45356#46719#0" />
+                <element signature="e#46724#47691#0" />
+                <element signature="e#47696#48730#0" />
+                <element signature="e#48735#49276#0" />
+                <element signature="e#49281#49796#0" />
+                <element signature="e#49801#50922#0" />
+                <element signature="e#50927#51236#0" />
+                <element signature="e#51241#51536#0" />
+                <element signature="e#51541#51704#0" />
+                <element signature="e#51713#52575#0" />
+                <element signature="e#52581#52883#0" />
+                <element signature="e#52890#53489#0" />
+                <element signature="e#53494#58818#0" />
+                <element signature="e#58823#63592#0" />
+                <element signature="e#63600#64635#0" />
+                <element signature="e#64640#65574#0" />
+                <element signature="e#65579#66612#0" />
+                <element signature="e#66617#67351#0" />
+                <element signature="e#68097#68255#0" />
+                <element signature="e#68409#69533#0" />
+                <element signature="e#69538#70064#0" />
+                <element signature="e#70069#70594#0" />
+                <element signature="e#70599#71255#0" />
+                <element signature="e#71260#72253#0" />
+                <element signature="e#72258#73554#0" />
+                <element signature="e#73559#75868#0" />
+                <element signature="e#75873#76583#0" />
+                <element signature="e#76588#77556#0" />
+                <element signature="e#77561#77901#0" />
+                <element signature="e#77906#78597#0" />
+                <element signature="e#78602#80171#0" />
+                <element signature="e#80176#80831#0" />
+                <element signature="e#80836#81308#0" />
+                <element signature="e#81313#81598#0" />
+                <element signature="e#81603#81782#0" />
+                <element signature="e#81787#82885#0" />
+                <element signature="e#83030#90052#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="armoury.properties" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/mods/armoury.properties">
+      <file leaf-file-name="CombatHandler.class" pinned="false" current-in-tab="false">
+        <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/CombatHandler.class">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="425">
-              <caret line="25" column="19" selection-start-line="25" selection-start-column="19" selection-end-line="25" selection-end-column="19" />
+            <state relative-caret-position="21744">
+              <caret line="1442" column="17" selection-start-line="1442" selection-start-column="17" selection-end-line="1442" selection-end-column="17" />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="ArmouryMod.java" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java">
+      <file leaf-file-name="Creature.class" pinned="false" current-in-tab="false">
+        <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/Creature.class">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1734">
-              <caret line="120" column="89" selection-start-line="120" selection-start-column="89" selection-end-line="120" selection-end-column="89" />
+            <state relative-caret-position="127232">
+              <caret line="7952" column="16" selection-start-line="7952" selection-start-column="16" selection-end-line="7952" selection-end-column="16" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="Body.class" pinned="false" current-in-tab="false">
+        <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/bodys/Body.class">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="48">
+              <caret line="6" selection-start-line="6" selection-end-line="6" />
             </state>
           </provider>
         </entry>
       </file>
     </leaf>
+  </component>
+  <component name="FindInProjectRecents">
+    <findStrings>
+      <find>hit</find>
+      <find>miss</find>
+      <find>crit</find>
+      <find>getWoundP</find>
+      <find>getCombatKnowledgeSkill</find>
+      <find>setDefenderWeapon</find>
+      <find>bonus</find>
+      <find>defBonus</find>
+      <find>attBonus</find>
+      <find>getPrivateField</find>
+      <find>checkDefenderParry</find>
+      <find>attCheck</find>
+      <find>getParryMod</find>
+      <find>getWeaponParry</find>
+      <find>this.creature</find>
+      <find>setParryEffects</find>
+    </findStrings>
+    <replaceStrings>
+      <replace>defender</replace>
+    </replaceStrings>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -266,9 +326,9 @@
     </option>
     <option name="modificationStamps">
       <map>
-        <entry key="$PROJECT_DIR$" value="4567342786408" />
+        <entry key="$PROJECT_DIR$" value="3056668268817" />
         <entry key="$PROJECT_DIR$/.gradle" value="0" />
-        <entry key="$PROJECT_DIR$/build.gradle" value="2580903092" />
+        <entry key="$PROJECT_DIR$/build.gradle" value="1392533045" />
         <entry key="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" value="2710121171" />
       </map>
     </option>
@@ -374,90 +434,61 @@
         <option value="$PROJECT_DIR$/src/main/java/mod/sin/armoury/ShieldTweaks.java" />
         <option value="$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java" />
         <option value="$PROJECT_DIR$/mods/armoury.properties" />
+        <option value="$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="260" />
-    <option name="y" value="20" />
+    <option name="x" value="495" />
+    <option name="y" value="36" />
     <option name="width" value="1400" />
     <option name="height" value="1000" />
-  </component>
-  <component name="ProjectLevelVcsManager">
-    <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="PackagesPane" />
       <pane id="Scope" />
-      <pane id="AndroidView" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
             <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
+              <item name="CombatHandled" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CombatHandled" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
             </path>
             <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
-              <item name="mods" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
+              <item name="CombatHandled" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CombatHandled" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="src" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
+              <item name="CombatHandled" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CombatHandled" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="src" type="462c0819:PsiDirectoryNode" />
               <item name="main" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
             </path>
             <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
+              <item name="CombatHandled" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CombatHandled" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="src" type="462c0819:PsiDirectoryNode" />
               <item name="main" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="java" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="Armoury" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
+              <item name="CombatHandled" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CombatHandled" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="src" type="462c0819:PsiDirectoryNode" />
               <item name="main" type="8a07ba80:GradleTreeStructureProvider$GradleModuleDirectoryNode" />
               <item name="java" type="462c0819:PsiDirectoryNode" />
-              <item name="armoury" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
-            </path>
-            <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
-              <item name="Gradle: com.github.Sindusk:sindusklibrary:v1.0" type="70bed36:NamedLibraryElementNode" />
-            </path>
-            <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
-              <item name="Gradle: com.github.Sindusk:sindusklibrary:v1.0" type="70bed36:NamedLibraryElementNode" />
-              <item name="sindusklibrary-v1.0.jar" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="Armoury" type="b2602c69:ProjectViewProjectNode" />
-              <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
-              <item name="Gradle: com.github.Sindusk:sindusklibrary:v1.0" type="70bed36:NamedLibraryElementNode" />
-              <item name="sindusklibrary-v1.0.jar" type="462c0819:PsiDirectoryNode" />
-              <item name="lib" type="462c0819:PsiDirectoryNode" />
+              <item name="combathandled" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
         </subPane>
       </pane>
+      <pane id="PackagesPane" />
+      <pane id="AndroidView" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -570,35 +601,36 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <frame x="-4" y="-4" width="1928" height="1060" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info anchor="right" id="Palette" order="3" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="right" id="Palette&#9;" order="3" />
-      <window_info id="Image Layers" order="2" />
-      <window_info anchor="right" id="Capture Analysis" order="3" />
       <window_info anchor="bottom" id="Event Log" order="7" side_tool="true" />
       <window_info anchor="right" id="Maven Projects" order="3" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.33769062" />
       <window_info anchor="bottom" id="Version Control" order="7" />
       <window_info anchor="bottom" id="Terminal" order="7" />
-      <window_info id="Capture Tool" order="2" />
       <window_info id="Designer" order="2" />
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.26119402" />
-      <window_info anchor="right" id="Gradle" order="3" visible="true" weight="0.1748401" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.2609375" />
+      <window_info anchor="right" id="Gradle" order="3" weight="0.17447917" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
-      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info id="UI Designer" order="2" />
-      <window_info anchor="right" id="Theme Preview" order="3" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
+      <window_info anchor="right" id="Capture Analysis" order="3" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
+      <window_info anchor="right" id="Theme Preview" order="3" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
-      <window_info anchor="bottom" id="Find" order="1" />
+      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
+      <window_info id="Image Layers" order="2" />
+      <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Build" order="7" weight="0.32943678" />
-      <window_info anchor="bottom" id="Message" order="0" />
+      <window_info id="Capture Tool" order="2" />
+      <window_info anchor="bottom" id="Find" order="1" />
     </layout>
   </component>
   <component name="VcsContentAnnotationSettings">
@@ -609,7 +641,157 @@
     <MESSAGE value="Add Sindusk Library dependency" />
     <option name="LAST_COMMIT_MESSAGE" value="Add Sindusk Library dependency" />
   </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="java-line">
+          <url>jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/CombatHandler.class</url>
+          <line>1988</line>
+          <properties />
+        </line-breakpoint>
+      </breakpoints>
+      <option name="time" value="3" />
+    </breakpoint-manager>
+  </component>
   <component name="editorHistoryManager">
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="13280">
+          <caret line="830" column="43" lean-forward="true" selection-start-line="830" selection-start-column="43" selection-end-line="830" selection-end-column="43" />
+          <folding>
+            <element signature="e#4030#4561#0" />
+            <element signature="e#6434#14535#0" />
+            <element signature="e#24683#26127#0" />
+            <element signature="e#26135#27437#0" />
+            <element signature="e#26231#26281#0" />
+            <element signature="e#27442#34805#0" />
+            <element signature="e#34812#40444#0" />
+            <element signature="e#40449#42848#0" />
+            <element signature="e#42856#45351#0" />
+            <element signature="e#45356#46719#0" />
+            <element signature="e#46724#47691#0" />
+            <element signature="e#47696#48730#0" />
+            <element signature="e#48735#49276#0" />
+            <element signature="e#49281#49796#0" />
+            <element signature="e#49801#50922#0" />
+            <element signature="e#50927#51236#0" />
+            <element signature="e#51241#51536#0" />
+            <element signature="e#51541#51704#0" />
+            <element signature="e#51713#52575#0" />
+            <element signature="e#52581#52883#0" />
+            <element signature="e#52890#53489#0" />
+            <element signature="e#53494#58818#0" />
+            <element signature="e#58823#63592#0" />
+            <element signature="e#63600#64635#0" />
+            <element signature="e#64640#65574#0" />
+            <element signature="e#65579#66612#0" />
+            <element signature="e#66617#67351#0" />
+            <element signature="e#68097#68255#0" />
+            <element signature="e#68409#69533#0" />
+            <element signature="e#69538#70064#0" />
+            <element signature="e#70069#70594#0" />
+            <element signature="e#70599#71255#0" />
+            <element signature="e#71260#72253#0" />
+            <element signature="e#72258#73554#0" />
+            <element signature="e#73559#75868#0" />
+            <element signature="e#75873#76583#0" />
+            <element signature="e#76588#77556#0" />
+            <element signature="e#77561#77901#0" />
+            <element signature="e#77906#78597#0" />
+            <element signature="e#78602#80171#0" />
+            <element signature="e#80176#80831#0" />
+            <element signature="e#80836#81308#0" />
+            <element signature="e#81313#81598#0" />
+            <element signature="e#81603#81782#0" />
+            <element signature="e#81787#82885#0" />
+            <element signature="e#83030#90052#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/CombatHandler.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="23072">
+          <caret line="1442" column="17" lean-forward="true" selection-start-line="1442" selection-start-column="17" selection-end-line="1442" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/Creature.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="127232">
+          <caret line="7952" column="16" selection-start-line="7952" selection-start-column="16" selection-end-line="7952" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/bodys/Body.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="48">
+          <caret line="6" lean-forward="true" selection-start-line="6" selection-end-line="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2128">
+          <caret line="133" lean-forward="true" selection-start-line="133" selection-end-line="133" />
+          <folding>
+            <element signature="e#4030#4561#0" />
+            <element signature="e#6434#14535#0" />
+            <element signature="e#24683#26127#0" />
+            <element signature="e#26135#27437#0" />
+            <element signature="e#26231#26281#0" />
+            <element signature="e#27442#34805#0" />
+            <element signature="e#34812#40444#0" />
+            <element signature="e#40449#42848#0" />
+            <element signature="e#42856#45351#0" />
+            <element signature="e#45356#46719#0" />
+            <element signature="e#46724#47691#0" />
+            <element signature="e#47696#48730#0" />
+            <element signature="e#48735#49276#0" />
+            <element signature="e#49281#49796#0" />
+            <element signature="e#49801#50922#0" />
+            <element signature="e#50927#51236#0" />
+            <element signature="e#51241#51536#0" />
+            <element signature="e#51541#51704#0" />
+            <element signature="e#51713#52575#0" />
+            <element signature="e#52581#52883#0" />
+            <element signature="e#52890#53489#0" />
+            <element signature="e#53494#58818#0" />
+            <element signature="e#58823#63592#0" />
+            <element signature="e#63600#64635#0" />
+            <element signature="e#64640#65574#0" />
+            <element signature="e#65579#66612#0" />
+            <element signature="e#66617#67351#0" />
+            <element signature="e#68097#68255#0" />
+            <element signature="e#68409#69533#0" />
+            <element signature="e#69538#70064#0" />
+            <element signature="e#70069#70594#0" />
+            <element signature="e#70599#71255#0" />
+            <element signature="e#71260#72253#0" />
+            <element signature="e#72258#73554#0" />
+            <element signature="e#73559#75868#0" />
+            <element signature="e#75873#76583#0" />
+            <element signature="e#76588#77556#0" />
+            <element signature="e#77561#77901#0" />
+            <element signature="e#77906#78597#0" />
+            <element signature="e#78602#80171#0" />
+            <element signature="e#80176#80831#0" />
+            <element signature="e#80836#81308#0" />
+            <element signature="e#81313#81598#0" />
+            <element signature="e#81603#81782#0" />
+            <element signature="e#81787#82885#0" />
+            <element signature="e#83030#90052#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/CombatHandler.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="32272">
+          <caret line="2017" selection-start-line="2017" selection-end-line="2105" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/build.gradle">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="204">
@@ -617,30 +799,9 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1105">
-          <caret line="65" column="21" selection-start-line="65" selection-start-column="21" selection-end-line="65" selection-end-column="21" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/mods/armoury.properties">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="425">
-          <caret line="25" column="19" selection-start-line="25" selection-start-column="19" selection-end-line="25" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1734">
-          <caret line="120" column="89" selection-start-line="120" selection-start-column="89" selection-end-line="120" selection-end-column="89" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/mods/armoury.properties" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java" />
     <entry file="file://$PROJECT_DIR$/build.gradle">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="204">
@@ -648,99 +809,118 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1105">
-          <caret line="65" column="21" lean-forward="true" selection-start-line="65" selection-start-column="21" selection-end-line="65" selection-end-column="21" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/mods/armoury.properties">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="425">
-          <caret line="25" column="19" lean-forward="true" selection-start-line="25" selection-start-column="19" selection-end-line="25" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1734">
-          <caret line="120" column="89" lean-forward="true" selection-start-line="120" selection-start-column="89" selection-end-line="120" selection-end-column="89" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.Sindusk/sindusklibrary/v1.0/95e8659b53f48d87c063664020727bc52a298b3d/sindusklibrary-v1.0.jar!/mod/sin/lib/SinduskLibrary.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-478">
-          <caret line="10" column="28" lean-forward="true" selection-start-line="10" selection-start-column="28" selection-end-line="10" selection-end-column="28" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.Sindusk/sindusklibrary/v1.0/95e8659b53f48d87c063664020727bc52a298b3d/sindusklibrary-v1.0.jar!/mod/sin/lib/Util.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1156">
-          <caret line="82" column="62" lean-forward="true" selection-start-line="82" selection-start-column="62" selection-end-line="82" selection-end-column="62" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/WeaponTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2848">
-          <caret line="25" column="56" selection-start-line="25" selection-start-column="56" selection-end-line="25" selection-end-column="56" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ShieldTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="382">
-          <caret line="80" column="26" selection-start-line="80" selection-start-column="26" selection-end-line="80" selection-end-column="26" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmourTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="194">
-          <caret line="18" column="13" selection-start-line="18" selection-start-column="13" selection-end-line="18" selection-end-column="13" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1105">
-          <caret line="65" column="21" selection-start-line="65" selection-start-column="21" selection-end-line="65" selection-end-column="21" />
-          <folding>
-            <element signature="imports" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1734">
-          <caret line="120" column="89" selection-start-line="120" selection-start-column="89" selection-end-line="120" selection-end-column="89" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/mods/armoury.properties">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="425">
-          <caret line="25" column="19" selection-start-line="25" selection-start-column="19" selection-end-line="25" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/mods/armoury.properties" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java" />
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.Sindusk/sindusklibrary/v1.0/95e8659b53f48d87c063664020727bc52a298b3d/sindusklibrary-v1.0.jar!/mod/sin/lib/SinduskLibrary.class" />
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.github.Sindusk/sindusklibrary/v1.0/95e8659b53f48d87c063664020727bc52a298b3d/sindusklibrary-v1.0.jar!/mod/sin/lib/Util.class" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/WeaponTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ShieldTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmourTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/CombatTweaks.java" />
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/sin/armoury/ArmouryMod.java" />
+    <entry file="file://$PROJECT_DIR$/mods/armoury.properties" />
     <entry file="file://$PROJECT_DIR$/build.gradle">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="204">
           <caret line="12" column="31" selection-start-line="12" selection-start-column="31" selection-end-line="12" selection-end-column="31" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandledMod.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="662">
+          <caret line="92" column="39" lean-forward="true" selection-start-line="92" selection-start-column="39" selection-end-line="92" selection-end-column="39" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/bodys/Body.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="48">
+          <caret line="6" selection-start-line="6" selection-end-line="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/bodys/BodyTemplate.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="512">
+          <caret line="61" column="29" lean-forward="true" selection-start-line="61" selection-start-column="29" selection-end-line="61" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/bodys/Wound.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="160">
+          <caret line="36" column="19" lean-forward="true" selection-start-line="36" selection-start-column="19" selection-end-line="36" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/Creature.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="127232">
+          <caret line="7952" column="16" selection-start-line="7952" selection-start-column="16" selection-end-line="7952" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.gotti.wurmunlimited/server/2726178/2e4f617e993276239f12f0f2b6b60c4f825c3e2c/server-2726178.jar!/com/wurmonline/server/creatures/CombatHandler.class">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="21744">
+          <caret line="1442" column="17" selection-start-line="1442" selection-start-column="17" selection-end-line="1442" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/main/java/mod/piddagoras/combathandled/CombatHandled.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="528">
+          <caret line="59" column="29" lean-forward="true" selection-start-line="59" selection-start-column="29" selection-end-line="59" selection-end-column="29" />
+          <folding>
+            <element signature="e#4030#4561#0" />
+            <element signature="e#6434#14535#0" />
+            <element signature="e#24683#26127#0" />
+            <element signature="e#26135#27437#0" />
+            <element signature="e#26231#26281#0" />
+            <element signature="e#27442#34805#0" />
+            <element signature="e#34812#40444#0" />
+            <element signature="e#40449#42848#0" />
+            <element signature="e#42856#45351#0" />
+            <element signature="e#45356#46719#0" />
+            <element signature="e#46724#47691#0" />
+            <element signature="e#47696#48730#0" />
+            <element signature="e#48735#49276#0" />
+            <element signature="e#49281#49796#0" />
+            <element signature="e#49801#50922#0" />
+            <element signature="e#50927#51236#0" />
+            <element signature="e#51241#51536#0" />
+            <element signature="e#51541#51704#0" />
+            <element signature="e#51713#52575#0" />
+            <element signature="e#52581#52883#0" />
+            <element signature="e#52890#53489#0" />
+            <element signature="e#53494#58818#0" />
+            <element signature="e#58823#63592#0" />
+            <element signature="e#63600#64635#0" />
+            <element signature="e#64640#65574#0" />
+            <element signature="e#65579#66612#0" />
+            <element signature="e#66617#67351#0" />
+            <element signature="e#68097#68255#0" />
+            <element signature="e#68409#69533#0" />
+            <element signature="e#69538#70064#0" />
+            <element signature="e#70069#70594#0" />
+            <element signature="e#70599#71255#0" />
+            <element signature="e#71260#72253#0" />
+            <element signature="e#72258#73554#0" />
+            <element signature="e#73559#75868#0" />
+            <element signature="e#75873#76583#0" />
+            <element signature="e#76588#77556#0" />
+            <element signature="e#77561#77901#0" />
+            <element signature="e#77906#78597#0" />
+            <element signature="e#78602#80171#0" />
+            <element signature="e#80176#80831#0" />
+            <element signature="e#80836#81308#0" />
+            <element signature="e#81313#81598#0" />
+            <element signature="e#81603#81782#0" />
+            <element signature="e#81787#82885#0" />
+            <element signature="e#83030#90052#0" />
+          </folding>
         </state>
       </provider>
     </entry>
