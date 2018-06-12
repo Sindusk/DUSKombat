@@ -18,6 +18,10 @@ public class CombatHandledMod
 implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListener, ServerStartedListener {
 	public static Logger logger = Logger.getLogger(CombatHandledMod.class.getName());
 
+	public static float minimumSwingTimer = 3.0f;
+	public static boolean useEpicBloodthirst = true;
+	public static boolean showItemCombatInformation = true;
+
     public static byte parseMaterialType(String str){
 	    byte mat = Materials.convertMaterialStringIntoByte(str);
 	    if(mat > 0){
@@ -30,6 +34,9 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	public void configure(Properties properties) {
 		logger.info("Beginning configuration...");
 		Prop.properties = properties;
+		minimumSwingTimer = Prop.getFloatProperty("minimumSwingTimer", minimumSwingTimer);
+		useEpicBloodthirst = Prop.getBooleanProperty("useEpicBloodthirst", useEpicBloodthirst);
+		showItemCombatInformation = Prop.getBooleanProperty("showItemCombatInformation", showItemCombatInformation);
 
     	for (String name : properties.stringPropertyNames()) {
             try {
@@ -59,6 +66,9 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
         }
         // Print values of configuration
         logger.info(" -- Mod Configuration -- ");
+    	logger.info(String.format("Minimum Swing Timer: %.2f seconds", minimumSwingTimer));
+    	logger.info(String.format("Use Epic Bloodthirst: %s", useEpicBloodthirst));
+    	logger.info(String.format("Show Item Combat Information: %s", showItemCombatInformation));
         //logger.log(Level.INFO, "enableNonPlayerCrits: " + enableNonPlayerCrits);
         logger.info(" -- Configuration complete -- ");
     }
@@ -84,10 +94,14 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
             };
             String desc4 = Descriptor.ofMethod(CtClass.booleanType, params4);
             replace = "{" +
-                    CombatHandled.class.getName()+".attackLoop($0.creature, $1, $2, $3, $4, $5);" +
-                    "logger.info(\"attacker = \"+$0.creature.getName()+\", opponent = \"+$1.getName()+\", combatCounter = \"+$2+\", opportunity = \"+$3+\", actionCounter = \"+$4);" +
+                    "  return "+CombatHandled.class.getName()+".attackHandled($0.creature, $1, $2, $3, $4, $5);" +
                     "}";
             Util.setBodyDescribed(thisClass, ctCombatHandler, "attack", desc4, replace);
+
+            Util.setReason("Insert examine method.");
+            CtClass ctItem = classPool.get("com.wurmonline.server.items.Item");
+            replace = ItemInfo.class.getName() + ".handleExamine($1, $0);";
+            Util.insertAfterDeclared(thisClass, ctItem, "sendEnchantmentStrings", replace);
 
         } catch ( NotFoundException | IllegalArgumentException | ClassCastException e) {
             throw new HookException(e);
