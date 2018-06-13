@@ -2,6 +2,7 @@ package mod.piddagoras.combathandled;
 
 import com.wurmonline.server.bodys.Wound;
 import com.wurmonline.server.combat.Armour;
+import com.wurmonline.server.combat.Weapon;
 import com.wurmonline.server.creatures.Communicator;
 import com.wurmonline.server.items.Item;
 import com.wurmonline.server.players.Player;
@@ -38,12 +39,22 @@ public class ItemInfo {
                 double baseDamage = DamageMethods.getBaseWeaponDamage(performer, null, target, true);
                 CombatHandled ch = CombatHandled.getCombatHandled(performer);
                 float speed = ch.getSpeed(performer, target);
+                double critChance = Weapon.getCritChanceForWeapon(target);
+                double parryChance = Weapon.getWeaponParryPercent(target)*Weapon.getMaterialParryBonus(target.getMaterial());
 
                 ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                 segments.add(new MulticolorLineSegment("Attack: ", COLOR_FORESTGREEN));
                 segments.add(new MulticolorLineSegment(String.format("%s damage / %.2f seconds [", (int)baseDamage, speed), COLOR_WHITE));
                 segments.add(new MulticolorLineSegment(String.format("%.1f", baseDamage/speed), COLOR_CYAN));
                 segments.add(new MulticolorLineSegment("]", COLOR_WHITE));
+                comm.sendColoredMessageEvent(segments);
+                segments.clear();
+                segments.add(new MulticolorLineSegment("Critical: ", COLOR_FORESTGREEN));
+                segments.add(new MulticolorLineSegment(String.format("%.2f%%", critChance*100d), COLOR_WHITE));
+                comm.sendColoredMessageEvent(segments);
+                segments.clear();
+                segments.add(new MulticolorLineSegment("Parry: ", COLOR_FORESTGREEN));
+                segments.add(new MulticolorLineSegment(String.format("%.2f%%", parryChance*100d), COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
                 //comm.sendNormalServerMessage(String.format("Swing Speed: %.2f seconds", speed));
             }

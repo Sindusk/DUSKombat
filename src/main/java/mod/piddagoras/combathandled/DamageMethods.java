@@ -3,6 +3,7 @@ package mod.piddagoras.combathandled;
 import com.wurmonline.server.Server;
 import com.wurmonline.server.behaviours.Vehicle;
 import com.wurmonline.server.behaviours.Vehicles;
+import com.wurmonline.server.bodys.Wound;
 import com.wurmonline.server.combat.Weapon;
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.creatures.CreatureTemplateIds;
@@ -30,6 +31,35 @@ public class DamageMethods {
             logger.log(Level.WARNING, creature.getName() + " had no strength. Weird.");
         }
         return attStrengthSkill;
+    }
+
+    public static String getAttackString(Creature attacker, Item weapon, byte woundType) {
+        if (weapon.isWeaponSword() && (woundType == Wound.TYPE_PIERCE || woundType == Wound.TYPE_SLASH)) {
+            if(woundType == Wound.TYPE_PIERCE){
+                return "pierce";
+            }
+            return "cut";
+        } else if (weapon.isWeaponPierce() && woundType == Wound.TYPE_PIERCE) {
+            return "pierce";
+        } else if (weapon.isWeaponSlash() && woundType == Wound.TYPE_SLASH) {
+            return "cut";
+        } else if (weapon.isWeaponCrush() && woundType == Wound.TYPE_CRUSH) {
+            return "maul";
+        } else if (weapon.isBodyPart() && weapon.getAuxData() != 100){
+            return attacker.getAttackStringForBodyPart(weapon);
+        }
+        if(!weapon.isBodyPart()) {
+            if(woundType == Wound.TYPE_BURN){ // Salve of fire
+                return "burn";
+            }else if(woundType == Wound.TYPE_COLD){ // Salve of frost
+                return "freeze";
+            }else if(woundType == Wound.TYPE_ACID){ // Potion of acid
+                return "corrode";
+            }else if(woundType == Wound.TYPE_POISON){ // Venom
+                return "poison";
+            }
+        }
+        return "hit";
     }
 
     public static double getBaseUnarmedDamage(Creature attacker, Item weapon){

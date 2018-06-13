@@ -22,6 +22,7 @@ import com.wurmonline.server.utils.CreatureLineSegment;
 import com.wurmonline.server.zones.VirtualZone;
 import com.wurmonline.shared.constants.Enchants;
 import com.wurmonline.shared.util.MulticolorLineSegment;
+import mod.sin.lib.WoundAssist;
 import org.gotti.wurmunlimited.modloader.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
@@ -99,27 +100,27 @@ ActionEntries
     public static final short DEFEND_LOW = 316;
     public static final short DEFEND_RIGHT = 317;
 */
-public class CombatHandled{
-    public static final Logger logger = Logger.getLogger(CombatHandled.class.getName());
-    public static HashMap<Creature, CombatHandled> combatMap = new HashMap<>();
+public class CombatHandledOld {
+    public static final Logger logger = Logger.getLogger(CombatHandledOld.class.getName());
+    public static HashMap<Creature, CombatHandledOld> combatMap = new HashMap<>();
 
     public static boolean attackHandled(Creature attacker, Creature opponent, int combatCounter, boolean opportunity, float actionCounter, Action act) {
-        CombatHandled ch;
+        CombatHandledOld ch;
         if(combatMap.containsKey(attacker)){
             ch = combatMap.get(attacker);
         }else{
-            ch = new CombatHandled();
+            ch = new CombatHandledOld();
             combatMap.put(attacker, ch);
         }
         //logger.info(String.format("Running attack loop for attacker %s against %s, counter = %.2f", attacker.getName(), opponent.getName(), actionCounter));
         return ch.attackLoop(attacker, opponent, combatCounter, opportunity, actionCounter, act);
     }
 
-    public static CombatHandled getCombatHandled(Creature creature){
+    public static CombatHandledOld getCombatHandled(Creature creature){
         if(combatMap.containsKey(creature)){
             return combatMap.get(creature);
         }else{
-            CombatHandled ch = new CombatHandled();
+            CombatHandledOld ch = new CombatHandledOld();
             combatMap.put(creature, ch);
             return ch;
         }
@@ -198,7 +199,7 @@ public class CombatHandled{
                 //attacker.getCommunicator().sendCombatStatus(CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
                 try {
                     // Using ReflectionUtil to call a protected method with arguments.
-                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
+                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), CombatHandledOld.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
                 } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                     e.printStackTrace();
                 }
@@ -314,339 +315,197 @@ public class CombatHandled{
     private boolean swingWeapon(Creature attacker, Item weapon, Creature opponent, boolean secondaryWeapon) {
         if (weapon.isWeaponBow()) {
             return false;
-        }
-
-        // Instead of having the opponent turn when they get attacked, we're going to turn the attacker when they swing.
-        if(!attacker.isPlayer() || !attacker.hasLink()){
-            attacker.turnTowardsCreature(opponent);
-            // Inlined version of setting attacker when a player gets attacked.
-            if(!opponent.isFighting() && (attacker.isPlayer() || attacker.isDominated())){
-                opponent.setTarget(attacker.getWurmId(), true);
-            }
-        }
-
-        dead=false; //Has to be global due to being set in multiple different methods
-
-        byte pos = BodyTemplate.torso;
-        try { // Obtain wound position based on their current targeting
-            pos = this.getWoundPos(this.currentStance, opponent);
-        } catch (Exception var9) {
-            logger.log(Level.WARNING, attacker.getName() + " " + var9.getMessage(), var9);
-        }
-
-        // Calculations for new combat system
-        double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon);
-        byte type = this.getDamageType(attacker, weapon, false);
-        double damage = this.getDamage(attacker, weapon, opponent);
-        setAttString(attacker, weapon, type);
-
-        // Reduce stamina from the attacker slightly.
-        // TODO: Rescale this stamina modification
-        // Desired - 300 base stamina, +300 per 1kg of weapon.
-        // Reductions based on some other factors, such as whether in defensive or aggressive stance.
-        attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
-
-        // Ensure the attack didn't miss
-        logger.info(String.format("%s's attackCheck: %.2f", attacker.getName(), attackCheck));
-        if(attackCheck >= 0) {
-            // Begin calculation for dodge.
-            double dodgeCheck = CombatMethods.getDodgeCheck(attacker, opponent, weapon, attackCheck);
-            double stamDodgeMult = 0.5d*(100d-opponent.getStatus().calcStaminaPercent()); // Up to -50 penalty to the check based on stamina.
-            dodgeCheck -= stamDodgeMult;
-            logger.info(String.format("%s dodgeCheck: %.2f [%.2f]", opponent.getName(), dodgeCheck, stamDodgeMult));
-            if(dodgeCheck < 0){
-                // Begin calculation for critical strike
-                double critChance = CombatMethods.getCriticalChance(attacker, opponent, weapon);
-                double critRoll = Server.rand.nextDouble();
-                logger.info(String.format("%s critRoll: %.2f [%.2f%% chance]", attacker.getName(), critRoll*100d, critChance*100d));
-                if(critRoll <= critChance){
-                    logger.info(String.format("%s has landed a critical hit on %s! Applying double damage and skipping to damage calculations.", attacker.getName(), opponent.getName()));
-                    damage *= 2.0D;
-                    dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
-                    return dead;
-                }else{
-                    // Begin calculation for parry chance
-                    double parryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck);
-                    logger.info(String.format("%s parryCheck: %.2f", opponent.getName(), parryCheck));
-                    if(parryCheck < 0){
-                        // Begin calculation for secondary parry or shield block
-                        if(opponent.getShield() != null){
-                            // TODO: Calculate shield block.
-                            logger.info("Found shield.");
-                        }else if(opponent.getSecondaryWeapons().length > 0){
-                            // Calculate secondary parries
-                            logger.info("Found secondary weapon(s).");
-                            boolean foundParry = false;
-                            for(Item weap : opponent.getSecondaryWeapons()){
-                                if(!weap.isBodyPartAttached()){
-                                    // TODO: Implement secondary weapon parry
-                                    foundParry = true;
-                                }
-                            }
-                            if(!foundParry){
-                                logger.info("None of their secondaries were weapons to parry with, moving to damage.");
-                                dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
-                                return dead;
-                            }
-                        }else{
-                            // They have nothing else to defend themselves with, deal damage.
-                            logger.info("No further defenses available, moving to damage.");
-                            dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
-                            return dead;
-                        }
-                    }else{
-                        logger.info(String.format("%s parries the attack from %s. (Rolled %.2f)", opponent.getName(), attacker.getName(), parryCheck));
-                        SoundPlayer.playSound(getParrySound(), opponent, 1.6F);
-                        ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
-                        segments.add(new CreatureLineSegment(opponent));
-                        segments.add(new MulticolorLineSegment(" ", ItemInfo.COLOR_WHITE));
-                        segments.add(new MulticolorLineSegment("parries", ItemInfo.COLOR_YELLOW));
-                        segments.add(new MulticolorLineSegment(" your ", ItemInfo.COLOR_WHITE));
-                        segments.add(new MulticolorLineSegment(weapon.getName(), ItemInfo.COLOR_LIGHTGRAY));
-                        segments.add(new MulticolorLineSegment(" with their ", ItemInfo.COLOR_WHITE));
-                        segments.add(new MulticolorLineSegment(opponent.getPrimWeapon().getName(), ItemInfo.COLOR_LIGHTGRAY));
-                        if(attacker.spamMode()){
-                            attacker.getCommunicator().sendColoredMessageCombat(segments);
-                        }
-                        if(opponent.spamMode()){
-                            segments.set(0, new MulticolorLineSegment("You", ItemInfo.COLOR_FORESTGREEN));
-                            segments.set(2, new MulticolorLineSegment("parry", ItemInfo.COLOR_YELLOW));
-                            segments.set(3, new MulticolorLineSegment(" the ", ItemInfo.COLOR_WHITE));
-                            segments.set(5, new MulticolorLineSegment(" from ", ItemInfo.COLOR_WHITE));
-                            segments.set(6, new CreatureLineSegment(attacker));
-                            segments.add(new MulticolorLineSegment(" with your ", ItemInfo.COLOR_WHITE));
-                            segments.add(new MulticolorLineSegment(opponent.getPrimWeapon().getName(), ItemInfo.COLOR_LIGHTGRAY));
-                            segments.add(new MulticolorLineSegment(".", ItemInfo.COLOR_WHITE));
-                            opponent.getCommunicator().sendColoredMessageCombat(segments);
-                        }
-                        return dead;
-                    }
-                }
-            }else{
-                // Opponent dodged the attack.
-                logger.info(String.format("%s's attack was dodged by %s. (Rolled %.2f)", attacker.getName(), opponent.getName(), dodgeCheck));
-                String sstring = dodgeCheck > 50.0 ? "sound.combat.miss.heavy" : "sound.combat.miss.med";
-                SoundPlayer.playSound(sstring, attacker, 1.6f);
-                ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
-                segments.add(new CreatureLineSegment(opponent));
-                segments.add(new MulticolorLineSegment(" ", ItemInfo.COLOR_WHITE));
-                segments.add(new MulticolorLineSegment("dodges", ItemInfo.COLOR_YELLOW));
-                segments.add(new MulticolorLineSegment(" your ", ItemInfo.COLOR_WHITE));
-                segments.add(new MulticolorLineSegment(weapon.getName(), ItemInfo.COLOR_LIGHTGRAY));
-                segments.add(new MulticolorLineSegment(".", ItemInfo.COLOR_WHITE));
-                if(attacker.spamMode()){
-                    attacker.getCommunicator().sendColoredMessageCombat(segments);
-                }
-                if(opponent.spamMode()){
-                    segments.set(0, new MulticolorLineSegment("You", ItemInfo.COLOR_FORESTGREEN));
-                    segments.set(2, new MulticolorLineSegment("dodge", ItemInfo.COLOR_YELLOW));
-                    segments.set(3, new MulticolorLineSegment(" the ", ItemInfo.COLOR_WHITE));
-                    segments.set(5, new MulticolorLineSegment(" from ", ItemInfo.COLOR_WHITE));
-                    segments.add(new CreatureLineSegment(attacker));
-                    segments.add(new MulticolorLineSegment(".", ItemInfo.COLOR_WHITE));
-                    opponent.getCommunicator().sendColoredMessageCombat(segments);
-                }
-                return dead;
-            }
-        }else{
-            // Attack missed.
-            logger.info(String.format("%s's attack has missed %s due to hit chance failure. (Rolled %.2f)", attacker.getName(), opponent.getName(), attackCheck));
-            // Send a new and fancy multicolor line!
-            String sstring = attackCheck < -50.0 ? "sound.combat.miss.med" : "sound.combat.miss.light";
-            SoundPlayer.playSound(sstring, attacker, 1.6F);
-            ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
-            segments.add(new MulticolorLineSegment("You", ItemInfo.COLOR_FORESTGREEN));
-            segments.add(new MulticolorLineSegment(" ", ItemInfo.COLOR_WHITE));
-            segments.add(new MulticolorLineSegment("miss", ItemInfo.COLOR_YELLOW));
-            segments.add(new MulticolorLineSegment(" with the ", ItemInfo.COLOR_WHITE));
-            segments.add(new MulticolorLineSegment(weapon.getName(), ItemInfo.COLOR_LIGHTGRAY));
-            segments.add(new MulticolorLineSegment(".", ItemInfo.COLOR_WHITE));
-            if (attacker.spamMode()) {
-                attacker.getCommunicator().sendColoredMessageCombat(segments);
-            }
-            if(opponent.spamMode()) {
-                segments.set(0, new CreatureLineSegment(attacker));
-                segments.set(2, new MulticolorLineSegment("misses", ItemInfo.COLOR_YELLOW));
-                opponent.getCommunicator().sendColoredMessageCombat(segments);
-            }
-            attacker.sendToLoggers("YOU MISS " + weapon.getName(), (byte)2);
-            opponent.sendToLoggers(attacker.getName() + " MISS " + weapon.getName(), (byte)2);
-
-            if (!attacker.isUnique() && attackCheck < -80D) {
-                this.setCurrentStance(attacker, -1, (byte)9);
-                segments.clear();
-                segments.add(new CreatureLineSegment(attacker));
-                segments.add(new MulticolorLineSegment(" makes a bad move and is an easy target!.", (byte)0));
-                opponent.getCommunicator().sendColoredMessageCombat(segments);
-                segments.get(1).setText(" make a bad move, making you an easy target.");
-                attacker.getCommunicator().sendColoredMessageCombat(segments);
-                attacker.getCurrentTile().checkOpportunityAttacks(attacker);
-                opponent.getCurrentTile().checkOpportunityAttacks(attacker);
-            } else if (Server.rand.nextInt(10) == 0) {
-                checkIfHitVehicle(attacker, opponent, damage);
-            }
-            return dead;
-        }
-
-        boolean hit=false;
-        crit=false; //Has to be global due to being set in multiple different methods
-        boolean miss=false;
-        boolean justOpen=false;
-
-        double attBonus = 0;
-        double defBonus = 0; // Temp
-        float chanceToHit = this.getChanceToHit(attacker, weapon, opponent, attBonus, defBonus);
-
-        this.addToSkills = true;
-
-        double attCheck = (double)(Server.rand.nextFloat() * 100.0F) * (1.0D + attacker.getVisionMod());
-        double defCheck = (double)(Server.rand.nextFloat() * 100.0F) * getCombatHandled(opponent).getDodgeMod(opponent);
-
-        this.sendStanceAnimation(attacker, this.currentStance, true);
-        Item defShield = opponent.getShield();
-        float percent = this.checkShield(attacker, opponent, weapon, damage, type, pos, chanceToHit, defBonus);
-        logger.info(String.format("Rolling %s's shield block chance. Rolled %.2f power on the block.", opponent.getName(), percent));
-        if (percent > 50.0F) {
-            logger.info(String.format("- %s shield blocked successfully (rolled %.2f), setting chance to hit to 0.", opponent.getName(), percent));
-            chanceToHit = 0.0F;
-        } else if (percent > 0.0F) {
-            double chanceToHitOld = chanceToHit;
-            chanceToHit *= 1.0F - percent / 100.0F;
-            logger.info(String.format("- %s half-shield blocked? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), percent, chanceToHitOld, chanceToHit));
-        } else{
-            logger.info(String.format("- %s shield block either failed or defender has no shield. (Rolled %.2f)", opponent.getName(), percent));
-        }
-
-        float parrPercent = -1.0F;
-        int parryRoll = Server.rand.nextInt(3);
-        logger.info(String.format("Rolling %s's parry chance. Conditions: fightStyle not 1 (%s) or random value is equal to 0 (%s). Must also have above 0 hit chance (%.2f).", opponent.getName(), opponent.getFightStyle(), parryRoll, chanceToHit));
-        if ((opponent.getFightStyle() != 1 || parryRoll == 0) && chanceToHit > 0.0F) {
-            parrPercent = this.checkDefenderParry(attacker, opponent, weapon, defShield, attCheck, defBonus, damage); //Not sure what to do.  This method uses attCheck (from previous attack), but attCheck provides no useful information and is actually just random.
-            if (parrPercent > 60.0F) {
-                logger.info(String.format("- %s parried successfully (rolled %.2f), setting hit chance to 0.", opponent.getName(), parrPercent));
-                chanceToHit = 0.0F;
-            } else if (parrPercent > 0.0F) {
-                double chanceToHitOld = chanceToHit;
-                chanceToHit *= 1.0F - parrPercent / 200.0F;
-                logger.info(String.format("- %s half-parried? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), parrPercent, chanceToHitOld, chanceToHit));
-            } else {
-                logger.info(String.format("- %s's parry either failed or defender has no parry chance. (Rolled %.2f)", opponent.getName(), parrPercent));
-            }
-        }
-
-        String combatDetails = " CHANCE:" + chanceToHit + ", roll=" + attCheck;
-        if (attacker.spamMode() && Servers.isThisATestServer()) {
-            attacker.getCommunicator().sendCombatSafeMessage(combatDetails);
-        }
-
-        attacker.sendToLoggers("YOU" + combatDetails, (byte)2);
-        opponent.sendToLoggers(attacker.getName() + combatDetails, (byte)2);
-        logger.info(String.format("Rolling %s's hit chance. If attCheck (%.2f) is less than chanceToHit (%.2f), it's a hit.", attacker.getName(), attCheck, chanceToHit));
-        if (attCheck < (double)chanceToHit) {
-            logger.info(String.format("- %s hit chance roll succeeded.", attacker.getName()));
-            if (opponent.isPlayer()) {
-                float critChance = Weapon.getCritChanceForWeapon(weapon);
-                logger.info(String.format("Base crit chance is %.2f%% for %s's weapon: %s", critChance, attacker.getName(), weapon.getName()));
-                if (isAtSoftSpot(getCombatHandled(opponent).currentStance, currentStance)) {
-                    critChance += 0.05F;
-                    logger.info(String.format("- Attack is at soft spot, increasing crit chance by 5.00%% to %.2f%%", critChance*100f));
-                }
-
-                int enchBon = CombatEngine.getEnchantBonus(weapon, opponent);
-                if (enchBon > 0) {
-                    critChance += 0.03F;
-                    logger.info(String.format("- Enchant bonus found, increasing crit chance by 3.00%% to %.2f%%", critChance*100f));
-                }
-
-                float rollCrit = Server.rand.nextFloat();
-                logger.info(String.format("- %s rolling for critical against %s, chance is %.2f%%", attacker.getName(), opponent.getName(), critChance*100f));
-                if (!weapon.isArtifact() && rollCrit < critChance) {
-                    logger.info(String.format("- %s landed a critical strike on %s! (%.2f < %.2f)", attacker.getName(), opponent.getName(), rollCrit*100f, critChance*100f));
-                    crit = true;
-                }
-            }
         } else {
-            logger.info(String.format("- Due to a comparison of attCheck (%.2f) being greater than or equal to chanceToHit (%.2f), %s's attack is guaranteed to miss.", attCheck, chanceToHit, attacker.getName()));
-            miss = true;
-        }
+            //resetFlags(opponent);
 
-        if (!miss && !crit) {
-            logger.info(String.format("%s did not miss or crit, so now we calculate %s's chance to dodge.", attacker.getName(), opponent.getName()));
-            boolean keepGoing = true;
-            //defCheck *= (double)opponent.getStatus().getDodgeTypeModifier();
+            // Instead of having the opponent turn when they get attacked, we're going to turn the attacker when they swing.
+            if(!attacker.isPlayer() || !attacker.hasLink()){
+                attacker.turnTowardsCreature(opponent);
+                // Inlined version of setting attacker when a player gets attacked.
+                if(!opponent.isFighting() && (attacker.isPlayer() || attacker.isDominated())){
+                    opponent.setTarget(attacker.getWurmId(), true);
+                }
+            }
+
+            // Calculations for new combat system
+            double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon);
+            attacker.getCommunicator().sendNormalServerMessage(String.format("Attack Check: %.2f", attackCheck));
+            byte type=this.getType(attacker, weapon, false);
+            double damage=this.getDamage(attacker, weapon, opponent);
+
+            boolean hit=false;
+            crit=false; //Has to be global due to being set in multiple different methods
+            boolean miss=false;
+            dead=false; //Has to be global due to being set in multiple different methods
+            byte pos = 0;
+            boolean justOpen=false;
+
+            double attBonus = 0;
+            double defBonus = 0; // Temp
+            float chanceToHit = this.getChanceToHit(attacker, weapon, opponent, attBonus, defBonus);
+
+            attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
+            this.addToSkills = true;
+
+            double attCheck = (double)(Server.rand.nextFloat() * 100.0F) * (1.0D + attacker.getVisionMod());
+            double defCheck = (double)(Server.rand.nextFloat() * 100.0F) * getCombatHandled(opponent).getDodgeMod(opponent);
+
+            setAttString(attacker, weapon, type);
+            this.sendStanceAnimation(attacker, this.currentStance, true);
+            Item defShield = opponent.getShield();
+            float percent = this.checkShield(attacker, opponent, weapon, damage, type, pos, chanceToHit, defBonus);
+            logger.info(String.format("Rolling %s's shield block chance. Rolled %.2f power on the block.", opponent.getName(), percent));
+            if (percent > 50.0F) {
+                logger.info(String.format("- %s shield blocked successfully (rolled %.2f), setting chance to hit to 0.", opponent.getName(), percent));
+                chanceToHit = 0.0F;
+            } else if (percent > 0.0F) {
+                double chanceToHitOld = chanceToHit;
+                chanceToHit *= 1.0F - percent / 100.0F;
+                logger.info(String.format("- %s half-shield blocked? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), percent, chanceToHitOld, chanceToHit));
+            } else{
+                logger.info(String.format("- %s shield block either failed or defender has no shield. (Rolled %.2f)", opponent.getName(), percent));
+            }
+
+            float parrPercent = -1.0F;
+            int parryRoll = Server.rand.nextInt(3);
+            logger.info(String.format("Rolling %s's parry chance. Conditions: fightStyle not 1 (%s) or random value is equal to 0 (%s). Must also have above 0 hit chance (%.2f).", opponent.getName(), opponent.getFightStyle(), parryRoll, chanceToHit));
+            if ((opponent.getFightStyle() != 1 || parryRoll == 0) && chanceToHit > 0.0F) {
+                parrPercent = this.checkDefenderParry(attacker, opponent, weapon, defShield, attCheck, defBonus, damage); //Not sure what to do.  This method uses attCheck (from previous attack), but attCheck provides no useful information and is actually just random.
+                if (parrPercent > 60.0F) {
+                    logger.info(String.format("- %s parried successfully (rolled %.2f), setting hit chance to 0.", opponent.getName(), parrPercent));
+                    chanceToHit = 0.0F;
+                } else if (parrPercent > 0.0F) {
+                    double chanceToHitOld = chanceToHit;
+                    chanceToHit *= 1.0F - parrPercent / 200.0F;
+                    logger.info(String.format("- %s half-parried? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), parrPercent, chanceToHitOld, chanceToHit));
+                } else {
+                    logger.info(String.format("- %s's parry either failed or defender has no parry chance. (Rolled %.2f)", opponent.getName(), parrPercent));
+                }
+            }
+
+            pos = BodyTemplate.torso;
+
             try {
-                // Using ReflectionUtil to call a protected method to obtain a value.
-                float opponentDodgeTypeModifier = ReflectionUtil.callPrivateMethod(opponent.getStatus(), ReflectionUtil.getMethod(opponent.getStatus().getClass(), "getDodgeTypeModifier"));
-                defCheck *= (double)opponentDodgeTypeModifier;
-                if (opponent.getMovePenalty() != 0) {
-                    defCheck *= (double)(1.0F + (float)opponent.getMovePenalty() / 10.0F);
+                // Obtain wound position based on their current targeting
+                pos = this.getWoundPos(this.currentStance, opponent);
+            } catch (Exception var9) {
+                logger.log(Level.WARNING, attacker.getName() + " " + var9.getMessage(), var9);
+            }
+
+            String combatDetails = " CHANCE:" + chanceToHit + ", roll=" + attCheck;
+            if (attacker.spamMode() && Servers.isThisATestServer()) {
+                attacker.getCommunicator().sendCombatSafeMessage(combatDetails);
+            }
+
+            attacker.sendToLoggers("YOU" + combatDetails, (byte)2);
+            opponent.sendToLoggers(attacker.getName() + combatDetails, (byte)2);
+            logger.info(String.format("Rolling %s's hit chance. If attCheck (%.2f) is less than chanceToHit (%.2f), it's a hit.", attacker.getName(), attCheck, chanceToHit));
+            if (attCheck < (double)chanceToHit) {
+                logger.info(String.format("- %s hit chance roll succeeded.", attacker.getName()));
+                if (opponent.isPlayer()) {
+                    float critChance = Weapon.getCritChanceForWeapon(weapon);
+                    logger.info(String.format("Base crit chance is %.2f%% for %s's weapon: %s", critChance, attacker.getName(), weapon.getName()));
+                    if (isAtSoftSpot(getCombatHandled(opponent).currentStance, currentStance)) {
+                        critChance += 0.05F;
+                        logger.info(String.format("- Attack is at soft spot, increasing crit chance by 5.00%% to %.2f%%", critChance*100f));
+                    }
+
+                    int enchBon = CombatEngine.getEnchantBonus(weapon, opponent);
+                    if (enchBon > 0) {
+                        critChance += 0.03F;
+                        logger.info(String.format("- Enchant bonus found, increasing crit chance by 3.00%% to %.2f%%", critChance*100f));
+                    }
+
+                    float rollCrit = Server.rand.nextFloat();
+                    logger.info(String.format("- %s rolling for critical against %s, chance is %.2f%%", attacker.getName(), opponent.getName(), critChance*100f));
+                    if (!weapon.isArtifact() && rollCrit < critChance) {
+                        logger.info(String.format("- %s landed a critical strike on %s! (%.2f < %.2f)", attacker.getName(), opponent.getName(), rollCrit*100f, critChance*100f));
+                        crit = true;
+                    }
+                }
+            } else {
+                logger.info(String.format("- Due to a comparison of attCheck (%.2f) being greater than or equal to chanceToHit (%.2f), %s's attack is guaranteed to miss.", attCheck, chanceToHit, attacker.getName()));
+                miss = true;
+            }
+
+            if (!miss && !crit) {
+                logger.info(String.format("%s did not miss or crit, so now we calculate %s's chance to dodge.", attacker.getName(), opponent.getName()));
+                boolean keepGoing = true;
+                //defCheck *= (double)opponent.getStatus().getDodgeTypeModifier();
+                try {
+                    // Using ReflectionUtil to call a protected method to obtain a value.
+                    float opponentDodgeTypeModifier = ReflectionUtil.callPrivateMethod(opponent.getStatus(), ReflectionUtil.getMethod(opponent.getStatus().getClass(), "getDodgeTypeModifier"));
+                    defCheck *= (double)opponentDodgeTypeModifier;
+                    if (opponent.getMovePenalty() != 0) {
+                        defCheck *= (double)(1.0F + (float)opponent.getMovePenalty() / 10.0F);
+                    }
+
+                    defCheck *= 1.0D - opponent.getMovementScheme().armourMod.getModifier();
+                    logger.info(String.format("- Comparing %s's defCheck (%.2f) less than 1/3 Body Control (%.2f) to see if %s dodges.", opponent.getName(), defCheck, opponent.getBodyControl() / 3D, opponent.getName()));
+                    if (defCheck < opponent.getBodyControl() / 3.0D) {
+                        logger.info(String.format("- %s successfully dodges the attack due to body control.", opponent.getName()));
+                        if ((double)(opponentDodgeTypeModifier * 100.0F) < opponent.getBodyControl() / 3.0D) {
+                            logger.log(Level.WARNING, opponent.getName() + " is impossible to hit except for crits: " + getCombatHandled(opponent).getDodgeMod(opponent) * 100.0D + " is always less than " + opponent.getBodyControl());
+                        }
+
+                        this.sendDodgeMessage(attacker, opponent, defCheck, pos);
+                        keepGoing = false;
+                        String dodgeDetails = "Dodge=" + defCheck + "<" + opponent.getBodyControl() / 3.0D + " dodgemod=" + getCombatHandled(opponent).getDodgeMod(opponent) + " dodgeType=" + opponentDodgeTypeModifier + " dodgeMovePenalty=" + opponent.getMovePenalty() + " armour=" + opponent.getMovementScheme().armourMod.getModifier();
+                        if (attacker.spamMode() && Servers.isThisATestServer()) {
+                            attacker.getCommunicator().sendCombatSafeMessage(dodgeDetails);
+                        }
+
+                        attacker.sendToLoggers(dodgeDetails, (byte)4);
+                        checkIfHitVehicle(attacker, opponent, damage);
+                    }
+                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    e.printStackTrace();
                 }
 
-                defCheck *= 1.0D - opponent.getMovementScheme().armourMod.getModifier();
-                logger.info(String.format("- Comparing %s's defCheck (%.2f) less than 1/3 Body Control (%.2f) to see if %s dodges.", opponent.getName(), defCheck, opponent.getBodyControl() / 3D, opponent.getName()));
-                if (defCheck < opponent.getBodyControl() / 3.0D) {
-                    logger.info(String.format("- %s successfully dodges the attack due to body control.", opponent.getName()));
-                    if ((double)(opponentDodgeTypeModifier * 100.0F) < opponent.getBodyControl() / 3.0D) {
-                        logger.log(Level.WARNING, opponent.getName() + " is impossible to hit except for crits: " + getCombatHandled(opponent).getDodgeMod(opponent) * 100.0D + " is always less than " + opponent.getBodyControl());
-                    }
+                if (keepGoing) {
+                    logger.info(String.format("- %s failed to dodge the attack, and now %s is ensured a hit.", opponent.getName(), attacker.getName()));
+                    hit = true;
+                }
+            }
 
-                    this.sendDodgeMessage(attacker, opponent, defCheck, pos);
-                    keepGoing = false;
-                    String dodgeDetails = "Dodge=" + defCheck + "<" + opponent.getBodyControl() / 3.0D + " dodgemod=" + getCombatHandled(opponent).getDodgeMod(opponent) + " dodgeType=" + opponentDodgeTypeModifier + " dodgeMovePenalty=" + opponent.getMovePenalty() + " armour=" + opponent.getMovementScheme().armourMod.getModifier();
-                    if (attacker.spamMode() && Servers.isThisATestServer()) {
-                        attacker.getCommunicator().sendCombatSafeMessage(dodgeDetails);
-                    }
+            if (hit || crit) {
+                logger.info(String.format("%s's attack is successful. Beginning damage calculation...", attacker.getName()));
+                attacker.sendToLoggers("YOU DAMAGE " + weapon.getName(), (byte)2);
+                opponent.sendToLoggers(attacker.getName() + " DAMAGE " + weapon.getName(), (byte)2);
+                dead = this.setDamage(attacker, opponent, weapon, damage, pos, type);
+            }
 
-                    attacker.sendToLoggers(dodgeDetails, (byte)4);
+            if (dead) {
+                this.setKillEffects(attacker, attacker, opponent);
+            }
+
+            if (miss) {
+                logger.info(String.format("%s's attack has either missed or was blocked/parried. Communicating that they're a failure.", attacker.getName()));
+                if (attacker.spamMode() && (chanceToHit > 0.0F || percent > 0.0F && parrPercent > 0.0F)) {
+                    attacker.getCommunicator().sendCombatNormalMessage("You miss with the " + weapon.getName() + ".");
+                    attacker.sendToLoggers("YOU MISS " + weapon.getName(), (byte)2);
+                    opponent.sendToLoggers(attacker.getName() + " MISS " + weapon.getName(), (byte)2);
+                }
+
+                if (!attacker.isUnique() && attCheck - (double)chanceToHit > 50.0D && Server.rand.nextInt(10) == 0) {
+                    justOpen = true;
+                    this.setCurrentStance(attacker, -1, (byte)9);
+                    ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
+                    segments.add(new CreatureLineSegment(attacker));
+                    segments.add(new MulticolorLineSegment(" makes a bad move and is an easy target!.", (byte)0));
+                    opponent.getCommunicator().sendColoredMessageCombat(segments);
+                    segments.get(1).setText(" make a bad move, making you an easy target.");
+                    attacker.getCommunicator().sendColoredMessageCombat(segments);
+                    attacker.getCurrentTile().checkOpportunityAttacks(attacker);
+                    opponent.getCurrentTile().checkOpportunityAttacks(attacker);
+                } else if (Server.rand.nextInt(10) == 0) {
                     checkIfHitVehicle(attacker, opponent, damage);
                 }
-            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-                e.printStackTrace();
             }
 
-            if (keepGoing) {
-                logger.info(String.format("- %s failed to dodge the attack, and now %s is ensured a hit.", opponent.getName(), attacker.getName()));
-                hit = true;
-            }
+            this.addToSkills = false;
+            return dead;
         }
-
-        if (hit || crit) {
-            logger.info(String.format("%s's attack is successful. Beginning damage calculation...", attacker.getName()));
-            attacker.sendToLoggers("YOU DAMAGE " + weapon.getName(), (byte)2);
-            opponent.sendToLoggers(attacker.getName() + " DAMAGE " + weapon.getName(), (byte)2);
-            dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
-        }
-
-        if (dead) {
-            this.setKillEffects(attacker, attacker, opponent);
-        }
-
-        if (miss) {
-            logger.info(String.format("%s's attack has either missed or was blocked/parried. Communicating that they're a failure.", attacker.getName()));
-            if (attacker.spamMode() && (chanceToHit > 0.0F || percent > 0.0F && parrPercent > 0.0F)) {
-                attacker.getCommunicator().sendCombatNormalMessage("You miss with the " + weapon.getName() + ".");
-                attacker.sendToLoggers("YOU MISS " + weapon.getName(), (byte)2);
-                opponent.sendToLoggers(attacker.getName() + " MISS " + weapon.getName(), (byte)2);
-            }
-
-            if (!attacker.isUnique() && attCheck - (double)chanceToHit > 50.0D && Server.rand.nextInt(10) == 0) {
-                justOpen = true;
-                this.setCurrentStance(attacker, -1, (byte)9);
-                ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
-                segments.add(new CreatureLineSegment(attacker));
-                segments.add(new MulticolorLineSegment(" makes a bad move and is an easy target!.", (byte)0));
-                opponent.getCommunicator().sendColoredMessageCombat(segments);
-                segments.get(1).setText(" make a bad move, making you an easy target.");
-                attacker.getCommunicator().sendColoredMessageCombat(segments);
-                attacker.getCurrentTile().checkOpportunityAttacks(attacker);
-                opponent.getCurrentTile().checkOpportunityAttacks(attacker);
-            } else if (Server.rand.nextInt(10) == 0) {
-                checkIfHitVehicle(attacker, opponent, damage);
-            }
-        }
-
-        this.addToSkills = false;
-        return dead;
     }
 
     //Copy pasta
@@ -690,64 +549,174 @@ public class CombatHandled{
 
 
     //Copy pasta
-    public byte getDamageType(Creature attacker, Item weapon, boolean rawType) {
+    public byte getType(Creature attacker, Item weapon, boolean rawType) {
         //byte woundType = attacker.getCombatDamageType();
         // getCombatDamageType() calls template.getCombatDamageType(). This call is identical and not private.
         byte woundType = attacker.getTemplate().getCombatDamageType();
-        if (weapon.isWeaponSword() || weapon.getTemplateId() == ItemList.halberd) {
-            if(rawType || Server.rand.nextInt(2) == 0){
+        if (!weapon.isWeaponSword() && weapon.getTemplateId() != ItemList.halberd) {
+            if (weapon.getTemplateId() == ItemList.crowbar) {
+                if (!rawType && Server.rand.nextInt(3) != 0) {
+                    woundType = Wound.TYPE_CRUSH;
+                } else {
+                    woundType = Wound.TYPE_PIERCE;
+                }
+            } else if (weapon.isWeaponSlash()) {
                 woundType = Wound.TYPE_SLASH;
-            }else{
+            } else if (weapon.isWeaponPierce()) {
                 woundType = Wound.TYPE_PIERCE;
-            }
-        } else if (weapon.getTemplateId() == ItemList.crowbar) {
-            if(rawType || Server.rand.nextInt(3) == 0){
-                woundType = Wound.TYPE_PIERCE;
-            }else{
+            } else if (weapon.isWeaponCrush()) {
                 woundType = Wound.TYPE_CRUSH;
+            } else if (weapon.isBodyPart()) {
+                if (weapon.getTemplateId() == ItemList.bodyFace) { // Bite
+                    woundType = Wound.TYPE_BITE;
+                } else if (weapon.getTemplateId() == ItemList.bodyHead) { // Headbutt
+                    woundType = Wound.TYPE_CRUSH;
+                }
             }
-        } else if (weapon.isWeaponSlash()) {
-            woundType = Wound.TYPE_SLASH;
-        } else if (weapon.isWeaponPierce()) {
+        } else if (!rawType && Server.rand.nextInt(2) != 0) {
             woundType = Wound.TYPE_PIERCE;
-        } else if (weapon.isWeaponCrush()) {
-            woundType = Wound.TYPE_CRUSH;
-        } else if (weapon.isBodyPart()) {
-            if (weapon.getTemplateId() == ItemList.bodyFace) { // Bite
-                woundType = Wound.TYPE_BITE;
-            } else if (weapon.getTemplateId() == ItemList.bodyHead) { // Headbutt
-                woundType = Wound.TYPE_CRUSH;
-            }
+        } else {
+            woundType = Wound.TYPE_SLASH;
         }
-        // Change the damage type if it's using damage type enchants
-        if(weapon.isWeapon() && weapon.enchantment != 0){
-            if(weapon.enchantment == Enchants.ACID_DAM){ // Potion of acid
-                woundType = Wound.TYPE_ACID;
-            }else if(weapon.enchantment == Enchants.FIRE_DAM){ // Salve of fire
-                woundType = Wound.TYPE_BURN;
-            }else if(weapon.enchantment == Enchants.FROST_DAM){ // Salve of frost
-                woundType = Wound.TYPE_COLD;
-            }
-        }
-        //logger.info(String.format("Setting %s's attack damage type to %s (%s).", attacker.getName(), woundType, WoundAssist.getWoundName(woundType)));
+        logger.info(String.format("Setting %s's attack damage type to %s (%s).", attacker.getName(), woundType, WoundAssist.getWoundName(woundType)));
         return woundType;
     }
     //Copy pasta
     private double getDamage(Creature attacker, Item weapon, Creature opponent) {
+        Skill attStrengthSkill;
         double damage;
+        /*try {
+            attStrengthSkill = attacker.getSkills().getSkill(SkillList.BODY_STRENGTH);
+        } catch (NoSuchSkillException var13) {
+            attStrengthSkill = attacker.getSkills().learn(SkillList.BODY_STRENGTH, 1.0F);
+            logger.log(Level.WARNING, attacker.getName() + " had no strength. Weird.");
+        }*/
 
-        if (weapon.isBodyPartAttached()) { // Unarmed damage is separate due to bearpaws and weaponless
+        if (weapon.isBodyPartAttached()) {
             damage = DamageMethods.getBaseUnarmedDamage(attacker, weapon);
-            //logger.info(String.format("%s is unarmed attacking with %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
-        } else { // Obtain the base damage of the weapon
+            logger.info(String.format("%s is unarmed attacking with %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
+            //damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F * attacker.getStatus().getDamageTypeModifier());
+            /*try {
+                // Using ReflectionUtil to call a protected method to adjust a variable.
+                float attackerDamageTypeModifier = ReflectionUtil.callPrivateMethod(attacker.getStatus(), ReflectionUtil.getMethod(attacker.getStatus().getClass(), "getDamageTypeModifier"));
+                damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F * attackerDamageTypeModifier);
+            } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                damage = (double)(attacker.getCombatDamage(weapon) * 1000.0F); // Assume it's 1.0F in the case that the reflection fails.
+                e.printStackTrace();
+            }
+            if (attacker.isPlayer()) {
+                Skill weaponLess = attacker.getWeaponLessFightingSkill();
+                double modifier = 1.0D + 2.0D * weaponLess.getKnowledge() / 100.0D;
+                damage *= modifier;
+            }
+
+            if (damage < 10000.0D && attacker.getBonusForSpellEffect(Enchants.CRET_BEARPAW) > 0.0F) {
+                damage += Server.getBuffedQualityEffect((double)(attacker.getBonusForSpellEffect(Enchants.CRET_BEARPAW) / 100.0F)) * 5000.0D;
+            }
+
+            float randomizer = (50.0F + Server.rand.nextFloat() * 50.0F) / 100.0F;
+            damage *= (double)randomizer;*/
+        } else {
             damage = DamageMethods.getBaseWeaponDamage(attacker, opponent, weapon, false);
-            //logger.info(String.format("%s is using weapon %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
+            logger.info(String.format("%s is using weapon %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
+            /*damage = Weapon.getModifiedDamageForWeapon(weapon, attStrengthSkill, opponent.getTemplate().getTemplateId() == 116) * 1000.0D;
+            if (!Servers.isThisAnEpicOrChallengeServer()) {
+                damage += (double)(weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus());
+            }
+
+            damage += Server.getBuffedQualityEffect((double)(weapon.getCurrentQualityLevel() / 100.0F)) * (double)Weapon.getBaseDamageForWeapon(weapon) * 2400.0D;
+            damage *= Weapon.getMaterialDamageBonus(weapon.getMaterial());
+            if (!opponent.isPlayer() && opponent.isHunter()) {
+                damage *= Weapon.getMaterialHunterDamageBonus(weapon.getMaterial());
+            }
+
+            damage *= (double)ItemBonus.getWeaponDamageIncreaseBonus(attacker, weapon);
+            if (Servers.isThisAnEpicOrChallengeServer()) {
+                damage *= (double)(1.0F + weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus() / 30000.0F);
+            }*/
         }
-        // All of the changes in the method are multipliers.
-        // Additive modifiers should be done before this, but no additive modifiers currently exist.
-        double mult = DamageMethods.getDamageMultiplier(this, attacker, opponent, weapon);
+        double mult = DamageMethods.getDamageMultiplier(null, attacker, opponent, weapon);
         damage *= mult;
-        //logger.info(String.format("Multiplying base damage by %.2f due to multipliers. Final damage: %.2f", mult, damage));
+        logger.info(String.format("Multiplying base damage by %.2f due to multipliers. Final damage: %.2f", mult, damage));
+
+        /*if (attacker.getEnemyPresense() > 1200 && opponent.isPlayer() && !weapon.isArtifact()) {
+            damage *= 1.15D;
+        }
+
+        if (!weapon.isArtifact() && this.hasRodEffect && opponent.isPlayer()) {
+            damage *= 1.2D;
+        }
+
+        Vehicle vehicle = Vehicles.getVehicleForId(opponent.getVehicle());
+        boolean mildStack = false;
+        if (weapon.isWeaponPolearm() && (vehicle != null && vehicle.isCreature() || opponent.isRidden() && weapon.isWeaponPierce())) {
+            damage *= 1.7D;
+        } else if (weapon.isArtifact()) {
+            mildStack = true;
+        } else if (attacker.getCultist() != null && attacker.getCultist().doubleWarDamage()) {
+            damage *= 1.5D;
+            mildStack = true;
+        } else if (attacker.getDeity() != null && attacker.getDeity().warrior && attacker.getFaith() >= 40.0F && attacker.getFavor() >= 20.0F) {
+            damage *= 1.25D;
+            mildStack = true;
+        }
+
+        if (attacker.isPlayer()) {
+            if ((attacker.getFightStyle() != 2 || attStrengthSkill.getRealKnowledge() < 20.0D) && attStrengthSkill.getRealKnowledge() != 20.0D) {
+                damage *= 1.0D + (attStrengthSkill.getRealKnowledge() - 20.0D) / 200.0D;
+            }
+
+            if (this.currentStrength == 0) {
+                Skill fstyle;
+
+                try {
+                    fstyle = attacker.getSkills().getSkill(10054);
+                } catch (NoSuchSkillException var12) {
+                    fstyle = attacker.getSkills().learn(10054, 1.0F);
+                }
+
+                if (fstyle.skillCheck((double)(opponent.getBaseCombatRating() * 3.0F), 0.0D, this.receivedFStyleSkill || opponent.isNoSkillFor(attacker), 10.0F, attacker, opponent) > 0.0D) {
+                    this.receivedFStyleSkill = true;
+                    damage *= 0.8D;
+                } else {
+                    damage *= 0.5D;
+                }
+            }
+
+            Skill fstyle;
+            if (attacker.getStatus().getStamina() > 2000 && this.currentStrength >= 1 && !this.receivedFStyleSkill) {
+                int num = SkillList.FIGHT_AGGRESSIVESTYLE;
+                if (this.currentStrength == 1) {
+                    num = SkillList.FIGHT_NORMALSTYLE;
+                }
+
+                try {
+                    fstyle = attacker.getSkills().getSkill(num);
+                } catch (NoSuchSkillException var11) {
+                    fstyle = attacker.getSkills().learn(num, 1.0F);
+                }
+
+                if (fstyle.skillCheck((double)(opponent.getBaseCombatRating() * 3.0F), 0.0D, this.receivedFStyleSkill || opponent.isNoSkillFor(attacker), 10.0F, attacker, opponent) > 0.0D) {
+                    this.receivedFStyleSkill = true;
+                    if (this.currentStrength > 1) {
+                        damage *= 1.0D + Server.getModifiedFloatEffect(fstyle.getRealKnowledge() / 100.0D) / (double)(mildStack ? 8.0F : 4.0F);
+                    }
+                }
+            }
+
+            float knowl = 1.0F;
+
+            try {
+                fstyle = attacker.getSkills().getSkill(weapon.getPrimarySkill());
+                knowl = (float)fstyle.getRealKnowledge();
+            } catch (NoSuchSkillException ignored) { }
+
+            if (knowl < 50.0F) {
+                damage = 0.8D * damage + 0.2D * (double)(knowl / 50.0F) * damage;
+            }
+        } else {
+            damage *= (double)(0.85F + (float)this.currentStrength * 0.15F);
+        }*/
 
         if (attacker.isStealth() && attacker.opponent != null && !attacker.isVisibleTo(opponent)) {
             ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
@@ -758,6 +727,14 @@ public class CombatHandled{
             damage = Math.min(50000.0D, damage * 4.0D);
         }
 
+        /*if (attacker.getCitizenVillage() != null && attacker.getCitizenVillage().getFaithWarBonus() > 0.0F) {
+            damage *= (double)(1.0F + attacker.getCitizenVillage().getFaithWarBonus() / 100.0F);
+        }
+
+        byte attackerFightLevel = getCreatureFightLevel(attacker);
+        if(attackerFightLevel >= 4){
+            damage *= 1.1D;
+        }*/
         return damage;
     }
 
@@ -986,7 +963,7 @@ public class CombatHandled{
         return blockPercent;
     }
     //Copy pasta
-    public boolean dealDamage(Creature creature, Creature defender, Item attWeapon, double ddamage, byte position, byte _type) {
+    public boolean setDamage(Creature creature, Creature defender, Item attWeapon, double ddamage, byte position, byte _type) {
         float armourMod = defender.getArmourMod();
         boolean metalArmour = false;
         Item armour = null;
@@ -1849,8 +1826,8 @@ public class CombatHandled{
                     if (defender.mayRaiseFightLevel()) {
                         e = Actions.actionEntrys[340];
                     }
-                } else if (defender.opponent == opponent && (e = CombatHandled.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
-                    e = CombatHandled.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                } else if (defender.opponent == opponent && (e = CombatHandledOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
+                    e = CombatHandledOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                 }
             }
             if (e == null) {
@@ -1859,18 +1836,18 @@ public class CombatHandled{
                         e = Actions.actionEntrys[340];
                     }
                 } else if (mycr - oppcr > 2.0f || getCombatHandled(defender).getSpeed(defender, defender.getPrimWeapon()) < 3.0f) {
-                    if (CombatHandled.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandled.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                        e = CombatHandled.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                    if (CombatHandledOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandledOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                        e = CombatHandledOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                     }
                 } else if (mycr >= oppcr) {
                     if (defender.getStatus().damage < opponent.getStatus().damage) {
-                        if (CombatHandled.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandled.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                            e = CombatHandled.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        if (CombatHandledOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandledOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                            e = CombatHandledOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     } else {
-                        e = CombatHandled.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        e = CombatHandledOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         if (e == null) {
-                            e = CombatHandled.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                            e = CombatHandledOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     }
                 }
@@ -1890,7 +1867,7 @@ public class CombatHandled{
                     if (e.getNumber() == 105) {
                         defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                     } else if (e.isStanceChange() && e.getNumber() != 340) {
-                        if (CombatHandled.getStanceForAction(e) != this.currentStance) {
+                        if (CombatHandledOld.getStanceForAction(e) != this.currentStance) {
                             defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                         }
                     } else if (defender.mayRaiseFightLevel() && e.getNumber() == 340) {
@@ -1945,13 +1922,13 @@ public class CombatHandled{
     //Copy pasta
     protected List<ActionEntry> getLowAttacks(Item weapon, boolean auto, Creature attacker, Creature opponent, float mycr, float oppcr, float primweaponskill) {
         LinkedList<ActionEntry> tempList = new LinkedList<>();
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 297)) {
+        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 297)) {
             this.addToList(tempList, weapon, (short) 297, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 294)) {
+        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 294)) {
             this.addToList(tempList, weapon, (short) 294, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 312)) {
+        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 312)) {
             this.addToList(tempList, weapon, (short) 312, attacker, opponent, mycr, oppcr, primweaponskill);
         }
         if (!auto && tempList.size() > 0) {
@@ -2072,7 +2049,7 @@ public class CombatHandled{
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandled.isStanceParrying(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (!CombatHandledOld.isStanceParrying(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2082,7 +2059,7 @@ public class CombatHandled{
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandled.isStanceOpposing(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (!CombatHandledOld.isStanceOpposing(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2092,7 +2069,7 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            if (CombatHandled.isStanceParrying(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isStanceOpposing(CombatHandled.getStanceForAction(e), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (CombatHandledOld.isStanceParrying(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isStanceOpposing(CombatHandledOld.getStanceForAction(e), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2257,13 +2234,13 @@ public class CombatHandled{
     }
     //Copy pasta
     protected static boolean isNextGoodStance(byte currentStance, byte nextStance, byte opponentStance) {
-        if (CombatHandled.isAtSoftSpot(nextStance, opponentStance)) {
+        if (CombatHandledOld.isAtSoftSpot(nextStance, opponentStance)) {
             return false;
         }
-        if (CombatHandled.isAtSoftSpot(opponentStance, currentStance)) {
+        if (CombatHandledOld.isAtSoftSpot(opponentStance, currentStance)) {
             return false;
         }
-        if (CombatHandled.isAtSoftSpot(opponentStance, nextStance)) {
+        if (CombatHandledOld.isAtSoftSpot(opponentStance, nextStance)) {
             return true;
         }
         if (currentStance == 0) {
@@ -2302,7 +2279,7 @@ public class CombatHandled{
     //Copy pasta
     protected static boolean isAtSoftSpot(byte stanceChecked, byte stanceUnderAttack) {
         byte[] opponentSoftSpots;
-        for (byte spot : opponentSoftSpots = CombatHandled.getSoftSpots(stanceChecked)) {
+        for (byte spot : opponentSoftSpots = CombatHandledOld.getSoftSpots(stanceChecked)) {
             if (spot != stanceUnderAttack) continue;
             return true;
         }
@@ -2335,16 +2312,16 @@ public class CombatHandled{
     }
     //Copy pasta;  It appears as though isNextGoodStance calls in this method uses wrong argument order.
     protected static boolean existsBetterOffensiveStance(byte _currentStance, byte opponentStance) {
-        if (CombatHandled.isAtSoftSpot(opponentStance, _currentStance)) {
+        if (CombatHandledOld.isAtSoftSpot(opponentStance, _currentStance)) {
             return false;
         }
-        boolean isOpponentAtSoftSpot = CombatHandled.isAtSoftSpot(_currentStance, opponentStance);
-        if (isOpponentAtSoftSpot || !CombatHandled.isStanceParrying(_currentStance, opponentStance) && !CombatHandled.isStanceOpposing(_currentStance, opponentStance)) {
+        boolean isOpponentAtSoftSpot = CombatHandledOld.isAtSoftSpot(_currentStance, opponentStance);
+        if (isOpponentAtSoftSpot || !CombatHandledOld.isStanceParrying(_currentStance, opponentStance) && !CombatHandledOld.isStanceOpposing(_currentStance, opponentStance)) {
             for (int x = 0; x < selectStanceList.size(); ++x) {
                 int num = Server.rand.nextInt(selectStanceList.size());
                 ActionEntry e = selectStanceList.get(num);
-                byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-                if (!CombatHandled.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+                byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+                if (!CombatHandledOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
                 return true;
             }
             return false;
@@ -2352,8 +2329,8 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (CombatHandled.isStanceParrying(_currentStance, nextStance) || CombatHandled.isStanceOpposing(_currentStance, nextStance)) continue;
+            byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (CombatHandledOld.isStanceParrying(_currentStance, nextStance) || CombatHandledOld.isStanceOpposing(_currentStance, nextStance)) continue;
             return true;
         }
         return false;
@@ -2363,8 +2340,8 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (!CombatHandled.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+            byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (!CombatHandledOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
             return e;
         }
         return null;
@@ -2377,7 +2354,7 @@ public class CombatHandled{
             return idealDist - dist;
         }
         Item wpn = creature.getPrimWeapon();
-        return CombatHandled.getDistdiff(wpn, creature, opponent);
+        return CombatHandledOld.getDistdiff(wpn, creature, opponent);
     }
     //Copy pasta
     protected static float getDistdiff(Item weapon, Creature creature, Creature opponent) {
@@ -2632,5 +2609,228 @@ public class CombatHandled{
 
         return Math.min(100.0F, Math.max(1.0F, combatRating));
     }
+
+    /*private boolean swingWeapon(Creature attacker, Item weapon, Creature opponent, boolean secondaryWeapon) {
+        if (weapon.isWeaponBow()) {
+            return false;
+        } else {
+            //resetFlags(opponent);
+
+            // Instead of having the opponent turn when they get attacked, we're going to turn the attacker when they swing.
+            if(!attacker.isPlayer() || !attacker.hasLink()){
+                attacker.turnTowardsCreature(opponent);
+                // Inlined version of setting attacker when a player gets attacked.
+                if(!opponent.isFighting() && (attacker.isPlayer() || attacker.isDominated())){
+                    opponent.setTarget(attacker.getWurmId(), true);
+                }
+            }
+            // Old method of turning creatures
+            double attBonus;
+            double defBonus;
+            computeBonuses:
+            {
+                attBonus = (double) attacker.zoneBonus - (double) attacker.getMovePenalty() * 0.5D;
+                if (this.currentStrength == 0) {
+                    attBonus -= 20.0D;
+                }
+                defBonus = (double) (opponent.zoneBonus - (float) opponent.getMovePenalty());
+                attBonus += (double) CombatEngine.getEnchantBonus(weapon, opponent);
+                if (this.addToSkills && opponent.isPlayer() && getCombatHandled(opponent).currentStrength == 0) {
+                    Skill def;
+                    try {
+                        def = opponent.getSkills().getSkill(10054);
+                    } catch (NoSuchSkillException var5) {
+                        def = opponent.getSkills().learn(10054, 1.0F);
+                    }
+                    if (opponent.getStatus().getStamina() > 2000 && def.skillCheck((double) (attacker.getBaseCombatRating() * 2.0F), 0.0D, attacker.isNoSkillFor(opponent) || getCombatHandled(opponent).receivedFStyleSkill, 10.0F, opponent, attacker) > 0.0D) {
+                        getCombatHandled(opponent).receivedFStyleSkill = true;
+                        defBonus += def.getKnowledge(0.0D) / 4.0D;
+                    }
+                }
+                if (getCombatHandled(opponent).currentStrength > 0 && opponent instanceof Player) {
+                    if (opponent.isMoving()) {
+                        defBonus -= (double) (getCombatHandled(opponent).currentStrength * 15);
+                    } else if (getCombatHandled(opponent).currentStrength > 1) {
+                        defBonus -= (double) (getCombatHandled(opponent).currentStrength * 7);
+                    }
+                }
+                if (opponent.isOnHostileHomeServer()) {
+                    defBonus -= 20.0D;
+                } else if (attacker.isMoving() && attacker instanceof Player) {
+                    attBonus -= 15.0D;
+                }
+            }
+            attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
+            this.addToSkills = true;
+            float chanceToHit = this.getChanceToHit(attacker, weapon, opponent, attBonus, defBonus);
+            byte type=this.getDamageType(attacker, weapon, false);
+            double damage=this.getDamage(attacker, weapon, opponent);
+            boolean hit=false;
+            crit=false; //Has to be global due to being set in multiple different methods
+            boolean miss=false;
+            dead=false; //Has to be global due to being set in multiple different methods
+            byte pos = 0;
+            boolean justOpen=false;
+
+            double attCheck = (double)(Server.rand.nextFloat() * 100.0F) * (1.0D + attacker.getVisionMod());
+            double defCheck = (double)(Server.rand.nextFloat() * 100.0F) * getCombatHandled(opponent).getDodgeMod(opponent);
+
+            setAttString(attacker, weapon, type);
+            this.sendStanceAnimation(attacker, this.currentStance, true);
+            Item defShield = opponent.getShield();
+            float percent = this.checkShield(attacker, opponent, weapon, damage, type, pos, chanceToHit, defBonus);
+            logger.info(String.format("Rolling %s's shield block chance. Rolled %.2f power on the block.", opponent.getName(), percent));
+            if (percent > 50.0F) {
+                logger.info(String.format("- %s shield blocked successfully (rolled %.2f), setting chance to hit to 0.", opponent.getName(), percent));
+                chanceToHit = 0.0F;
+            } else if (percent > 0.0F) {
+                float chanceToHitOld = chanceToHit;
+                chanceToHit *= 1.0F - percent / 100.0F;
+                logger.info(String.format("- %s half-shield blocked? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), percent, chanceToHitOld, chanceToHit));
+            } else{
+                logger.info(String.format("- %s shield block either failed or defender has no shield. (Rolled %.2f)", opponent.getName(), percent));
+            }
+
+            float parrPercent = -1.0F;
+            int parryRoll = Server.rand.nextInt(3);
+            logger.info(String.format("Rolling %s's parry chance. Conditions: fightStyle not 1 (%s) or random value is equal to 0 (%s). Must also have above 0 hit chance (%.2f).", opponent.getName(), opponent.getFightStyle(), parryRoll, chanceToHit));
+            if ((opponent.getFightStyle() != 1 || parryRoll == 0) && chanceToHit > 0.0F) {
+                parrPercent = this.checkDefenderParry(attacker, opponent, weapon, defShield, attCheck, defBonus, damage); //Not sure what to do.  This method uses attCheck (from previous attack), but attCheck provides no useful information and is actually just random.
+                if (parrPercent > 60.0F) {
+                    logger.info(String.format("- %s parried successfully (rolled %.2f), setting hit chance to 0.", opponent.getName(), parrPercent));
+                    chanceToHit = 0.0F;
+                } else if (parrPercent > 0.0F) {
+                    float chanceToHitOld = chanceToHit;
+                    chanceToHit *= 1.0F - parrPercent / 200.0F;
+                    logger.info(String.format("- %s half-parried? Rolled %.2f, and set hit chance from %.2f%% to %.2f%%", opponent.getName(), parrPercent, chanceToHitOld, chanceToHit));
+                } else {
+                    logger.info(String.format("- %s's parry either failed or defender has no parry chance. (Rolled %.2f)", opponent.getName(), parrPercent));
+                }
+            }
+
+            pos = BodyTemplate.torso;
+
+            try {
+                // Obtain wound position based on their current targeting
+                pos = this.getWoundPos(this.currentStance, opponent);
+            } catch (Exception var9) {
+                logger.log(Level.WARNING, attacker.getName() + " " + var9.getMessage(), var9);
+            }
+
+            String combatDetails = " CHANCE:" + chanceToHit + ", roll=" + attCheck;
+            if (attacker.spamMode() && Servers.isThisATestServer()) {
+                attacker.getCommunicator().sendCombatSafeMessage(combatDetails);
+            }
+
+            attacker.sendToLoggers("YOU" + combatDetails, (byte)2);
+            opponent.sendToLoggers(attacker.getName() + combatDetails, (byte)2);
+            logger.info(String.format("Rolling %s's hit chance. If attCheck (%.2f) is less than chanceToHit (%.2f), it's a hit.", attacker.getName(), attCheck, chanceToHit));
+            if (attCheck < (double)chanceToHit) {
+                logger.info(String.format("- %s hit chance roll succeeded.", attacker.getName()));
+                if (opponent.isPlayer()) {
+                    float critChance = Weapon.getCritChanceForWeapon(weapon);
+                    logger.info(String.format("Base crit chance is %.2f%% for %s's weapon: %s", critChance, attacker.getName(), weapon.getName()));
+                    if (isAtSoftSpot(getCombatHandled(opponent).currentStance, currentStance)) {
+                        critChance += 0.05F;
+                        logger.info(String.format("- Attack is at soft spot, increasing crit chance by 5.00%% to %.2f%%", critChance*100f));
+                    }
+
+                    int enchBon = CombatEngine.getEnchantBonus(weapon, opponent);
+                    if (enchBon > 0) {
+                        critChance += 0.03F;
+                        logger.info(String.format("- Enchant bonus found, increasing crit chance by 3.00%% to %.2f%%", critChance*100f));
+                    }
+
+                    float rollCrit = Server.rand.nextFloat();
+                    logger.info(String.format("- %s rolling for critical against %s, chance is %.2f%%", attacker.getName(), opponent.getName(), critChance*100f));
+                    if (!weapon.isArtifact() && rollCrit < critChance) {
+                        logger.info(String.format("- %s landed a critical strike on %s! (%.2f < %.2f)", attacker.getName(), opponent.getName(), rollCrit*100f, critChance*100f));
+                        crit = true;
+                    }
+                }
+            } else {
+                logger.info(String.format("- Due to a comparison of attCheck (%.2f) being greater than or equal to chanceToHit (%.2f), %s's attack is guaranteed to miss.", attCheck, chanceToHit, attacker.getName()));
+                miss = true;
+            }
+
+            if (!miss && !crit) {
+                logger.info(String.format("%s did not miss or crit, so now we calculate %s's chance to dodge.", attacker.getName(), opponent.getName()));
+                boolean keepGoing = true;
+                //defCheck *= (double)opponent.getStatus().getDodgeTypeModifier();
+                try {
+                    // Using ReflectionUtil to call a protected method to obtain a value.
+                    float opponentDodgeTypeModifier = ReflectionUtil.callPrivateMethod(opponent.getStatus(), ReflectionUtil.getMethod(opponent.getStatus().getClass(), "getDodgeTypeModifier"));
+                    defCheck *= (double)opponentDodgeTypeModifier;
+                    if (opponent.getMovePenalty() != 0) {
+                        defCheck *= (double)(1.0F + (float)opponent.getMovePenalty() / 10.0F);
+                    }
+
+                    defCheck *= 1.0D - opponent.getMovementScheme().armourMod.getModifier();
+                    logger.info(String.format("- Comparing %s's defCheck (%.2f) less than 1/3 Body Control (%.2f) to see if %s dodges.", opponent.getName(), defCheck, opponent.getBodyControl() / 3D, opponent.getName()));
+                    if (defCheck < opponent.getBodyControl() / 3.0D) {
+                        logger.info(String.format("- %s successfully dodges the attack due to body control.", opponent.getName()));
+                        if ((double)(opponentDodgeTypeModifier * 100.0F) < opponent.getBodyControl() / 3.0D) {
+                            logger.log(Level.WARNING, opponent.getName() + " is impossible to hit except for crits: " + getCombatHandled(opponent).getDodgeMod(opponent) * 100.0D + " is always less than " + opponent.getBodyControl());
+                        }
+
+                        this.sendDodgeMessage(attacker, opponent, defCheck, pos);
+                        keepGoing = false;
+                        String dodgeDetails = "Dodge=" + defCheck + "<" + opponent.getBodyControl() / 3.0D + " dodgemod=" + getCombatHandled(opponent).getDodgeMod(opponent) + " dodgeType=" + opponentDodgeTypeModifier + " dodgeMovePenalty=" + opponent.getMovePenalty() + " armour=" + opponent.getMovementScheme().armourMod.getModifier();
+                        if (attacker.spamMode() && Servers.isThisATestServer()) {
+                            attacker.getCommunicator().sendCombatSafeMessage(dodgeDetails);
+                        }
+
+                        attacker.sendToLoggers(dodgeDetails, (byte)4);
+                        checkIfHitVehicle(attacker, opponent, damage);
+                    }
+                } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                    e.printStackTrace();
+                }
+
+                if (keepGoing) {
+                    logger.info(String.format("- %s failed to dodge the attack, and now %s is ensured a hit.", opponent.getName(), attacker.getName()));
+                    hit = true;
+                }
+            }
+
+            if (hit || crit) {
+                logger.info(String.format("%s's attack is successful. Beginning damage calculation...", attacker.getName()));
+                attacker.sendToLoggers("YOU DAMAGE " + weapon.getName(), (byte)2);
+                opponent.sendToLoggers(attacker.getName() + " DAMAGE " + weapon.getName(), (byte)2);
+                dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
+            }
+
+            if (dead) {
+                this.setKillEffects(attacker, attacker, opponent);
+            }
+
+            if (miss) {
+                logger.info(String.format("%s's attack has either missed or was blocked/parried. Communicating that they're a failure.", attacker.getName()));
+                if (attacker.spamMode() && (chanceToHit > 0.0F || percent > 0.0F && parrPercent > 0.0F)) {
+                    attacker.getCommunicator().sendCombatNormalMessage("You miss with the " + weapon.getName() + ".");
+                    attacker.sendToLoggers("YOU MISS " + weapon.getName(), (byte)2);
+                    opponent.sendToLoggers(attacker.getName() + " MISS " + weapon.getName(), (byte)2);
+                }
+
+                if (!attacker.isUnique() && attCheck - (double)chanceToHit > 50.0D && Server.rand.nextInt(10) == 0) {
+                    justOpen = true;
+                    this.setCurrentStance(attacker, -1, (byte)9);
+                    ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
+                    segments.add(new CreatureLineSegment(attacker));
+                    segments.add(new MulticolorLineSegment(" makes a bad move and is an easy target!.", (byte)0));
+                    opponent.getCommunicator().sendColoredMessageCombat(segments);
+                    segments.get(1).setText(" make a bad move, making you an easy target.");
+                    attacker.getCommunicator().sendColoredMessageCombat(segments);
+                    attacker.getCurrentTile().checkOpportunityAttacks(attacker);
+                    opponent.getCurrentTile().checkOpportunityAttacks(attacker);
+                } else if (Server.rand.nextInt(10) == 0) {
+                    checkIfHitVehicle(attacker, opponent, damage);
+                }
+            }
+
+            this.addToSkills = false;
+            return dead;
+        }
+    }*/
 
 }

@@ -1,5 +1,7 @@
 package mod.piddagoras.combathandled;
 
+import com.wurmonline.server.creatures.Creature;
+import com.wurmonline.server.creatures.Creatures;
 import com.wurmonline.server.items.Materials;
 import javassist.ClassPool;
 import javassist.CtClass;
@@ -21,6 +23,14 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	public static float minimumSwingTimer = 3.0f;
 	public static boolean useEpicBloodthirst = true;
 	public static boolean showItemCombatInformation = true;
+
+    public static void pollCreatureActionStacks(){
+        for(Creature c : Creatures.getInstance().getCreatures()){
+            if(c.isFighting()) {
+                c.getActions().poll(c);
+            }
+        }
+    }
 
     public static byte parseMaterialType(String str){
 	    byte mat = Materials.convertMaterialStringIntoByte(str);
@@ -97,6 +107,11 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
                     "  return "+CombatHandled.class.getName()+".attackHandled($0.creature, $1, $2, $3, $4, $5);" +
                     "}";
             Util.setBodyDescribed(thisClass, ctCombatHandler, "attack", desc4, replace);
+
+            Util.setReason("Poll creature action stacks on every update.");
+            CtClass ctZones = classPool.get("com.wurmonline.server.zones.Zones");
+            replace = CombatHandledMod.class.getName()+".pollCreatureActionStacks();";
+            Util.insertBeforeDeclared(thisClass, ctZones, "pollNextZones", replace);
 
             Util.setReason("Insert examine method.");
             CtClass ctItem = classPool.get("com.wurmonline.server.items.Item");
