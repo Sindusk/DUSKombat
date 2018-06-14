@@ -88,29 +88,52 @@ public class CombatMethods {
             attackCheck -= opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) * 0.05d;
         }
 
-        return fightingSkill.skillCheck(attackCheck*2d, bonus, true, 10.0f);
+        double dodgeCheck = fightingSkill.skillCheck(attackCheck*2d, bonus, true, 10.0f);
+
+        if(opponent.isUnique()){
+            dodgeCheck += 20;
+        }
+
+        return dodgeCheck;
     }
     public static double getCriticalChance(Creature attacker, Creature opponent, Item weapon){
         return (double)Weapon.getCritChanceForWeapon(weapon);
     }
     public static double getParryCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
-        Item oppWeapon = opponent.getPrimWeapon();
-        if(oppWeapon.isBodyPartAttached()){
+        Item defWeapon = opponent.getPrimWeapon();
+        if(defWeapon.isBodyPartAttached()){
             return -100; // Unarmed cannot parry.
-        }else if(Weapon.getWeaponParryPercent(oppWeapon) == 0){
+        }else if(Weapon.getWeaponParryPercent(defWeapon) == 0){
             return -100; // Weapons with no parry chance also cannot parry.
         }
-        Skill oppWeaponSkill = CombatHandled.getCreatureWeaponSkill(opponent, oppWeapon);
+        Skill defWeaponSkill = CombatHandled.getCreatureWeaponSkill(opponent, defWeapon);
         // TODO: Calculate bonus
         double bonus = 0;
 
-        double parryCheck = oppWeaponSkill.skillCheck(attackCheck, oppWeapon, bonus, true, 10.0f);
+        double parryCheck = defWeaponSkill.skillCheck(attackCheck, defWeapon, bonus, true, 10.0f);
 
         // Apply a penalty to the parry based on the base parry percent.
-        double parryPenalty = 100D*(1D-Weapon.getWeaponParryPercent(oppWeapon));
-        logger.info(String.format("%s has penalty of %.2f for parry percent %.2f", oppWeapon.getName(), parryPenalty, Weapon.getWeaponParryPercent(oppWeapon)));
+        double parryPenalty = 100D*(1D-Weapon.getWeaponParryPercent(defWeapon));
+        //logger.info(String.format("%s has penalty of %.2f for parry percent %.2f", defWeapon.getName(), parryPenalty, Weapon.getWeaponParryPercent(defWeapon)));
         parryCheck -= parryPenalty;
 
         return parryCheck;
+    }
+    public static double getShieldCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
+        Item defShield = opponent.getShield(); // Cannot be null because check occurs before calling this method.
+        int defShieldSkillNum = SkillList.GROUP_SHIELDS;
+        try {
+            defShieldSkillNum = defShield.getPrimarySkill();
+        } catch (NoSuchSkillException ex) {
+            logger.warning(String.format("Could not find proper skill for shield %s. Resorting to Shields group skill.", defShield.getName()));
+        }
+        Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
+
+        // TODO: Calculate bonus
+        double bonus = 0;
+
+        double shieldCheck = defShieldSkill.skillCheck(attackCheck, defShield, bonus, false, 10.0F);
+
+        return shieldCheck;
     }
 }

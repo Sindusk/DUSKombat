@@ -12,15 +12,22 @@ import com.wurmonline.server.players.ItemBonus;
 import com.wurmonline.server.skills.NoSuchSkillException;
 import com.wurmonline.server.skills.Skill;
 import com.wurmonline.server.skills.SkillList;
+import com.wurmonline.server.utils.CreatureLineSegment;
 import com.wurmonline.shared.constants.Enchants;
+import com.wurmonline.shared.util.MulticolorLineSegment;
 import org.gotti.wurmunlimited.modloader.ReflectionUtil;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class DamageMethods {
     public static Logger logger = Logger.getLogger(DamageMethods.class.getName());
+
+    public static boolean canDealDamage(double damage, double armourMod){
+        return true;
+    }
 
     protected static Skill getCreatureSkill(Creature creature, int skillnum){
         Skill attStrengthSkill;
@@ -93,11 +100,12 @@ public class DamageMethods {
 
         // Get weapon base damage
         double damage = Weapon.getModifiedDamageForWeapon(weapon, attStrengthSkill, fullDamage || (opponent != null && opponent.getTemplate().getTemplateId() == CreatureTemplateIds.WEAPON_TEST_DUMMY)) * 1000.0D;
-        //if (!Servers.isThisAnEpicOrChallengeServer()) {
+
         if(!CombatHandledMod.useEpicBloodthirst){ // Additive Bloodthirst (standard)
             damage += (double)(weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus());
         }
 
+        // Add multipliers to damage
         damage += Server.getBuffedQualityEffect((double)(weapon.getCurrentQualityLevel() / 100.0F)) * (double)Weapon.getBaseDamageForWeapon(weapon) * 2400.0D;
         damage *= Weapon.getMaterialDamageBonus(weapon.getMaterial());
         if (opponent != null && !opponent.isPlayer() && opponent.isHunter()) {
@@ -106,10 +114,15 @@ public class DamageMethods {
 
         damage *= (double)ItemBonus.getWeaponDamageIncreaseBonus(attacker, weapon);
 
-        //if (Servers.isThisAnEpicOrChallengeServer()) {
         if(CombatHandledMod.useEpicBloodthirst){ // Multiplicative Bloodthirst (epic)
             damage *= (double)(1.0F + weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus() / 30000.0F);
         }
+
+        float rottingTouchPower = weapon.getSpellDamageBonus();
+        if(rottingTouchPower > 0){
+            damage *= damage * rottingTouchPower * 0.002; // 0.2% increased damage per power
+        }
+
         return damage;
     }
     public static double getDamageMultiplier(CombatHandled ch, Creature attacker, Creature opponent, Item weapon){
@@ -211,5 +224,33 @@ public class DamageMethods {
         }
 
         return mult;
+    }
+
+    public static double getDamage(CombatHandled ch, Creature attacker, Item weapon, Creature opponent) {
+        double damage;
+
+        if (weapon.isBodyPartAttached()) { // Unarmed damage is separate due to bearpaws and weaponless
+            damage = DamageMethods.getBaseUnarmedDamage(attacker, weapon);
+            //logger.info(String.format("%s is unarmed attacking with %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
+        } else { // Obtain the base damage of the weapon
+            damage = DamageMethods.getBaseWeaponDamage(attacker, opponent, weapon, false);
+            //logger.info(String.format("%s is using weapon %s. Base damage: %.2f", attacker.getName(), weapon.getName(), damage));
+        }
+        // All of the changes in the method are multipliers.
+        // Additive modifiers should be done before this, but no additive modifiers currently exist.
+        double mult = DamageMethods.getDamageMultiplier(ch, attacker, opponent, weapon);
+        damage *= mult;
+        //logger.info(String.format("Multiplying base damage by %.2f due to multipliers. Final damage: %.2f", mult, damage));
+
+        if (attacker.isStealth() && attacker.opponent != null && !attacker.isVisibleTo(opponent)) {
+            ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
+            segments.add(new CreatureLineSegment(attacker));
+            segments.add(new MulticolorLineSegment(" backstab ", (byte)0));
+            segments.add(new CreatureLineSegment(opponent));
+            attacker.getCommunicator().sendColoredMessageCombat(segments);
+            damage = Math.min(50000.0D, damage * 4.0D);
+        }
+
+        return damage;
     }
 }
