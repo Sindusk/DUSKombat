@@ -118,6 +118,32 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
             replace = ItemInfo.class.getName() + ".handleExamine($1, $0);";
             Util.insertAfterDeclared(thisClass, ctItem, "sendEnchantmentStrings", replace);
 
+            Util.setReason("Replace the addWound method.");
+            CtClass ctString = classPool.get("java.lang.String");
+            CtClass ctBattle = classPool.get("com.wurmonline.server.combat.Battle");
+            CtClass ctCombatEngine = classPool.get("com.wurmonline.server.combat.CombatEngine");
+            // @Nullable Creature performer, Creature defender, byte type, int pos, double damage, float armourMod,
+            // String attString, @Nullable Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist
+            CtClass[] params1 = {
+                    ctCreature,
+                    ctCreature,
+                    CtClass.byteType,
+                    CtClass.intType,
+                    CtClass.doubleType,
+                    CtClass.floatType,
+                    ctString,
+                    ctBattle,
+                    CtClass.floatType,
+                    CtClass.floatType,
+                    CtClass.booleanType,
+                    CtClass.booleanType
+            };
+            String desc1 = Descriptor.ofMethod(CtClass.booleanType, params1);
+            replace = "{" +
+                    " return "+DamageEngine.class.getName()+".addWound($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);" +
+                    "}";
+            Util.setBodyDescribed(thisClass, ctCombatEngine, "addWound", desc1, replace);
+
         } catch ( NotFoundException | IllegalArgumentException | ClassCastException e) {
             throw new HookException(e);
         }

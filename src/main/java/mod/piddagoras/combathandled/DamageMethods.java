@@ -118,6 +118,7 @@ public class DamageMethods {
             damage *= (double)(1.0F + weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus() / 30000.0F);
         }
 
+        // Rotting Touch
         float rottingTouchPower = weapon.getSpellDamageBonus();
         if(rottingTouchPower > 0){
             damage *= damage * rottingTouchPower * 0.002; // 0.2% increased damage per power
