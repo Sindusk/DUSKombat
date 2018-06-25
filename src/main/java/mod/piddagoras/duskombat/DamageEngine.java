@@ -1,6 +1,5 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
-import com.wurmonline.server.MessageServer;
 import com.wurmonline.server.Server;
 import com.wurmonline.server.bodys.DbWound;
 import com.wurmonline.server.bodys.TempWound;
@@ -9,61 +8,39 @@ import com.wurmonline.server.combat.Battle;
 import com.wurmonline.server.combat.BattleEvent;
 import com.wurmonline.server.creatures.CombatHandler;
 import com.wurmonline.server.creatures.Creature;
+import com.wurmonline.server.items.Item;
 import com.wurmonline.server.utils.CreatureLineSegment;
 import com.wurmonline.shared.constants.Enchants;
 import com.wurmonline.shared.util.MulticolorLineSegment;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Logger;
 
 public class DamageEngine {
     public static Logger logger = Logger.getLogger(DamageEngine.class.getName());
 
-    public static String getRealDamageString(final double damage) {
-        if (damage < 500.0) {
-            return "tickle";
+    // Map all damage dealt instances in a map. This is extremely useful in some cases.
+    public static HashMap<Long, Map<Long, Double>> dealtDamage = new HashMap<>();
+    public static void addDealtDamage(long defender, long attacker, double damage){
+        if(dealtDamage.containsKey(defender)){
+            Map<Long, Double> dealers = dealtDamage.get(defender);
+            if(!dealers.containsKey(attacker)){
+                dealers.put(attacker, damage);
+            }else{
+                double newDam = dealers.get(attacker);
+                newDam += damage;
+                dealers.put(attacker, newDam);
+            }
+        }else{
+            Map<Long, Double> dealers = new HashMap<>();
+            dealers.put(attacker, damage);
+            dealtDamage.put(defender, dealers);
         }
-        if (damage < 1000.0) {
-            return "slap";
-        }
-        if (damage < 2500.0) {
-            return "irritate";
-        }
-        if (damage < 5000.0) {
-            return "hurt";
-        }
-        if (damage < 10000.0) {
-            return "harm";
-        }
-        return "damage";
     }
 
-    public static String getStrengthString(final double damage) {
-        if (damage <= 0.0) {
-            return "unnoticeably";
-        }
-        if (damage <= 1.0) {
-            return "very lightly";
-        }
-        if (damage <= 2.0) {
-            return "lightly";
-        }
-        if (damage <= 3.0) {
-            return "pretty hard";
-        }
-        if (damage <= 6.0) {
-            return "hard";
-        }
-        if (damage <= 10.0) {
-            return "very hard";
-        }
-        if (damage <= 20.0) {
-            return "extremely hard";
-        }
-        return "deadly hard";
-    }
-
-    public static boolean addWound(Creature performer, Creature defender, byte type, int pos, double damage, float armourMod, String attString, Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist) {
+    public static boolean addWound(Creature performer, Creature defender, byte type, int pos, double damage, float armourMod, String attString, Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist, Item weapon, boolean critical, boolean glance) {
         // Debug message
         String perfName = "VOID";
         String defName = "VOID";
@@ -73,28 +50,62 @@ public class DamageEngine {
         if(defender != null){
             defName = defender.getName();
         }
-        logger.info(String.format("%s dealing wound to %s", perfName, defName));
+        //logger.info(String.format("%s dealing wound to %s", perfName, defName));
+
+        if(defender == null){
+            logger.severe("Called addWound with a null defender.");
+            return false;
+        }
 
         // Inform creature AI that wounds were inflicted
         if (performer != null && performer.getTemplate().getCreatureAI() != null) {
             damage = performer.getTemplate().getCreatureAI().causedWound(performer, defender, type, pos, armourMod, damage);
         }
-        if (defender != null && defender.getTemplate().getCreatureAI() != null) {
+        if (defender.getTemplate().getCreatureAI() != null) {
             damage = defender.getTemplate().getCreatureAI().receivedWound(defender, performer, type, pos, armourMod, damage);
         }
 
-
+        // Calculate resistances and similar before applying damage.
         if (!alreadyCalculatedResist) {
-            if ((type == 8 || type == 4 || type == 10) && defender.getCultist() != null && defender.getCultist().hasNoElementalDamage()) {
-                return false;
+            // Path of Power's Elemental Immunity special ability
+            if(defender.getCultist() != null && defender.getCultist().hasNoElementalDamage()){
+                if(type == Wound.TYPE_BURN || type == Wound.TYPE_COLD || type == Wound.TYPE_ACID){
+                    byte level = defender.getCultist().getLevel();
+                    float reduction = Math.max(0.0f, 1f-((level-8)*0.2f)); // 20% reduced damage per power
+                    if(performer != null && (performer.isPlayer() || performer.isDominated())){ // Reduce effects by 50% in PvP
+                        reduction = reduction + (1-reduction) * 0.5f;
+                    }
+                    if(reduction <= 0){
+                        if(performer != null) {
+                            CombatMessages.sendElementalWoundIgnoreAttackMessage(performer, defender, type);
+                        }
+                        CombatMessages.sendElementalWoundIgnoreDefenseMessage(defender, type);
+                        return false;
+                    }
+                    damage *= reduction;
+                }
             }
+
+            // Continuum sorcery buff - reduces damage taken by 20%.
             if (defender.hasSpellEffect(Enchants.CRET_CONTINUUM)) {
                 damage *= 0.8;
             }
+
+            // Apply resistances/vulnerabilities
             damage *= Wound.getResistModifier(defender, type);
         }
+
         boolean dead = false;
         if (DamageMethods.canDealDamage(damage, armourMod)) {
+            if(performer != null) {
+                addDealtDamage(defender.getWurmId(), performer.getWurmId(), damage);
+            }
+            // Trigger Testing
+            /*HashMap<String, Object> data = new HashMap<>();
+            data.put("type", type);
+            Event.DamageTaken.occur(data);*/
+
+            // Stoneskin sorcery - avoids up to 3 attacks.
             if (defender.hasSpellEffect(Enchants.CRET_STONESKIN)) {
                 defender.reduceStoneSkin();
                 return false;
@@ -104,35 +115,42 @@ public class DamageEngine {
             String broadCastString = "";
             final String otherString = (CombatHandler.getOthersString() == "") ? (attString + "s") : CombatHandler.getOthersString();
             CombatHandler.setOthersString("");
-            if (Server.rand.nextInt(10) <= 6 && defender.getBody().getWounds() != null) {
+
+            // 80% chance to stack the wound on an existing one.
+            if (Server.rand.nextInt(10) <= 7 && defender.getBody().getWounds() != null) {
                 wound = defender.getBody().getWounds().getWoundTypeAtLocation((byte)pos, type);
             }
-            if (wound != null) {
+
+            if (wound != null) { // Stack damage and other effects onto an existing wound
                 defender.setWounded();
-                if (infection > 0.0f) {
-                    wound.setInfectionSeverity(Math.min(99.0f, wound.getInfectionSeverity() + Server.rand.nextInt((int)infection)));
+                if (infection > 0.0f) { // Add infection
+                    wound.setInfectionSeverity(Math.min(99.0f, wound.getInfectionSeverity() + infection));
                 }
-                if (poison > 0.0f) {
+                if (poison > 0.0f) { // Add poison
                     wound.setPoisonSeverity(Math.min(99.0f, wound.getPoisonSeverity() + poison));
                 }
-                wound.setBandaged(false);
-                if (wound.getHealEff() > 0 && Server.rand.nextInt(2) == 0) {
+                wound.setBandaged(false); // Remove bandaging
+                if (wound.getHealEff() > 0 && Server.rand.nextInt(2) == 0) { // 50% chance to remove healing covers
                     wound.setHealeff((byte)0);
                 }
-                dead = wound.modifySeverity((int)(damage * armourMod), performer != null && performer.isPlayer());
+                dead = wound.modifySeverity((int)(damage * armourMod), performer != null && (performer.isPlayer() || performer.isDominated()));
                 foundWound = true;
             }
             else {
                 if (!defender.isPlayer()) {
                     wound = new TempWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection);
-                }
-                else {
+                } else {
                     wound = new DbWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection, performer != null && performer.isPlayer());
                 }
                 defender.setWounded();
             }
             if (performer != null) {
-                ArrayList<MulticolorLineSegment> segments = new ArrayList<MulticolorLineSegment>();
+                // Send combat messages only if the target has been attacked by another creature
+                String woundLoc = defender.getBody().getWoundLocationString(wound.getLocation());
+                CombatMessages.sendDamageMessages(performer, defender, weapon, attString, damage, armourMod, type, woundLoc, critical, glance);
+
+
+                /*ArrayList<MulticolorLineSegment> segments = new ArrayList<MulticolorLineSegment>();
                 segments.add(new CreatureLineSegment(performer));
                 segments.add(new MulticolorLineSegment(" " + otherString + " ", (byte)0));
                 if (performer == defender) {
@@ -158,7 +176,7 @@ public class DamageEngine {
                 for (final MulticolorLineSegment s : segments) {
                     s.setColor((byte)3);
                 }
-                performer.getCommunicator().sendColoredMessageCombat(segments);
+                performer.getCommunicator().sendColoredMessageCombat(segments);*/
             }
             if (defender.isDominated()) {
                 if (!archery) {
@@ -171,7 +189,7 @@ public class DamageEngine {
                 }
             }
             if (infection > 0.0f && performer != null) {
-                final ArrayList<MulticolorLineSegment> segments = new ArrayList<MulticolorLineSegment>();
+                final ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                 segments.add(new MulticolorLineSegment("Your weapon", (byte)3));
                 segments.add(new MulticolorLineSegment(" infects ", (byte)3));
                 segments.add(new CreatureLineSegment(defender));
@@ -184,7 +202,7 @@ public class DamageEngine {
                 defender.getCommunicator().sendColoredMessageCombat(segments);
             }
             if (poison > 0.0f && performer != null) {
-                final ArrayList<MulticolorLineSegment> segments = new ArrayList<MulticolorLineSegment>();
+                final ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                 segments.add(new MulticolorLineSegment("Your weapon", (byte)3));
                 segments.add(new MulticolorLineSegment(" poisons ", (byte)3));
                 segments.add(new CreatureLineSegment(defender));

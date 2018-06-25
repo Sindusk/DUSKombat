@@ -1,4 +1,4 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.Server;
 import com.wurmonline.server.behaviours.Vehicle;
@@ -101,7 +101,7 @@ public class DamageMethods {
         // Get weapon base damage
         double damage = Weapon.getModifiedDamageForWeapon(weapon, attStrengthSkill, fullDamage || (opponent != null && opponent.getTemplate().getTemplateId() == CreatureTemplateIds.WEAPON_TEST_DUMMY)) * 1000.0D;
 
-        if(!CombatHandledMod.useEpicBloodthirst){ // Additive Bloodthirst (standard)
+        if(!DUSKombatMod.useEpicBloodthirst){ // Additive Bloodthirst (standard)
             damage += (double)(weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus());
         }
 
@@ -114,19 +114,19 @@ public class DamageMethods {
 
         damage *= (double)ItemBonus.getWeaponDamageIncreaseBonus(attacker, weapon);
 
-        if(CombatHandledMod.useEpicBloodthirst){ // Multiplicative Bloodthirst (epic)
+        if(DUSKombatMod.useEpicBloodthirst){ // Multiplicative Bloodthirst (epic)
             damage *= (double)(1.0F + weapon.getCurrentQualityLevel() / 100.0F * weapon.getSpellExtraDamageBonus() / 30000.0F);
         }
 
         // Rotting Touch
-        float rottingTouchPower = weapon.getSpellDamageBonus();
+        float rottingTouchPower = weapon.getWeaponSpellDamageBonus();
         if(rottingTouchPower > 0){
-            damage *= damage * rottingTouchPower * 0.002; // 0.2% increased damage per power
+            damage += damage * rottingTouchPower * 0.002; // 0.2% increased damage per power
         }
 
         return damage;
     }
-    public static double getDamageMultiplier(CombatHandled ch, Creature attacker, Creature opponent, Item weapon){
+    public static double getDamageMultiplier(DUSKombat ch, Creature attacker, Creature opponent, Item weapon){
         double mult = 1.0D;
         // Multiply damage by 1.15 if they've been near enemy players for 1200 seconds (20 minutes)
         if (attacker.getEnemyPresense() > 1200 && opponent.isPlayer() && !weapon.isArtifact()) {
@@ -219,7 +219,7 @@ public class DamageMethods {
         }
 
         // Increase damage by 10% if the creature is focused to level 4 or above.
-        byte attackerFightLevel = CombatHandled.getCreatureFightLevel(attacker);
+        byte attackerFightLevel = DUSKombat.getCreatureFightLevel(attacker);
         if(attackerFightLevel >= 4){
             mult *= 1.1D;
         }
@@ -227,7 +227,7 @@ public class DamageMethods {
         return mult;
     }
 
-    public static double getDamage(CombatHandled ch, Creature attacker, Item weapon, Creature opponent) {
+    public static double getDamage(DUSKombat ch, Creature attacker, Item weapon, Creature opponent) {
         double damage;
 
         if (weapon.isBodyPartAttached()) { // Unarmed damage is separate due to bearpaws and weaponless

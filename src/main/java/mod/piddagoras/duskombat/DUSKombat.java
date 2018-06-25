@@ -1,4 +1,4 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.*;
 import com.wurmonline.server.behaviours.*;
@@ -21,6 +21,7 @@ import com.wurmonline.server.skills.Skills;
 import com.wurmonline.server.sounds.SoundPlayer;
 import com.wurmonline.server.spells.SpellEffect;
 import com.wurmonline.server.utils.CreatureLineSegment;
+import com.wurmonline.shared.constants.BodyPartConstants;
 import com.wurmonline.shared.constants.Enchants;
 import com.wurmonline.shared.util.MulticolorLineSegment;
 import org.gotti.wurmunlimited.modloader.ReflectionUtil;
@@ -100,29 +101,111 @@ ActionEntries
     public static final short DEFEND_LOW = 316;
     public static final short DEFEND_RIGHT = 317;
 */
-public class CombatHandled{
-    public static final Logger logger = Logger.getLogger(CombatHandled.class.getName());
-    public static HashMap<Creature, CombatHandled> combatMap = new HashMap<>();
+public class DUSKombat {
+    public static final Logger logger = Logger.getLogger(DUSKombat.class.getName());
+    public static HashMap<Creature, DUSKombat> combatMap = new HashMap<>();
 
     public static boolean attackHandled(Creature attacker, Creature opponent, int combatCounter, boolean opportunity, float actionCounter, Action act) {
-        CombatHandled ch;
+        DUSKombat ch;
         if(combatMap.containsKey(attacker)){
             ch = combatMap.get(attacker);
         }else{
-            ch = new CombatHandled();
+            ch = new DUSKombat();
             combatMap.put(attacker, ch);
         }
         //logger.info(String.format("Running attack loop for attacker %s against %s, counter = %.2f", attacker.getName(), opponent.getName(), actionCounter));
         return ch.attackLoop(attacker, opponent, combatCounter, opportunity, actionCounter, act);
     }
 
-    public static CombatHandled getCombatHandled(Creature creature){
+    public static DUSKombat getCombatHandled(Creature creature){
         if(combatMap.containsKey(creature)){
             return combatMap.get(creature);
         }else{
-            CombatHandled ch = new CombatHandled();
+            DUSKombat ch = new DUSKombat();
             combatMap.put(creature, ch);
             return ch;
+        }
+    }
+
+    public static class ParryResistance{
+        public Creature creature;
+        public int templateId;
+        public long lastUpdated;
+        public double currentResistance;
+        public long fullyExpires;
+        public boolean isShield;
+        public ParryResistance(Creature creature, int templateId, long lastUpdated, double currentResistance, boolean isShield){
+            this.creature = creature;
+            this.templateId = templateId;
+            this.lastUpdated = lastUpdated;
+            this.currentResistance = currentResistance;
+            this.fullyExpires = lastUpdated;
+            this.isShield = isShield;
+        }
+    }
+    protected static final double PARRY_RECOVERY_SECOND = 0.04d;
+
+    protected static HashMap<Creature, ArrayList<ParryResistance>> parryResistance = new HashMap<>();
+    protected static ParryResistance getParryResistanceFor(Creature creature, int templateId, boolean isShield){
+        if(!parryResistance.containsKey(creature)){
+            parryResistance.put(creature, new ArrayList<>());
+        }
+        for(ParryResistance res : parryResistance.get(creature)){
+            if(res.templateId == templateId){
+                return res;
+            }
+        }
+        ParryResistance res = new ParryResistance(creature, templateId, System.currentTimeMillis(), 1, isShield);
+        parryResistance.get(creature).add(res);
+        return res;
+    }
+    protected static double updateParryResistance(Creature creature, Item item, double additionalResistance){
+        int templateId = item.getTemplateId();
+        if(item.isWeaponSword()){ // Swords have half parry penalty
+            additionalResistance *= 0.5d;
+        }
+        ParryResistance res = getParryResistanceFor(creature, templateId, item.isShield());
+        long timeDelta = System.currentTimeMillis() - res.lastUpdated;
+        double secondsPassed = timeDelta / (double) TimeConstants.SECOND_MILLIS;
+        res.currentResistance = Math.min(1d, res.currentResistance+(secondsPassed*PARRY_RECOVERY_SECOND));
+        res.currentResistance = Math.max(0d, res.currentResistance-additionalResistance);
+        res.lastUpdated = System.currentTimeMillis();
+        double secondsUntilFullyHealed = (1-(res.currentResistance))/PARRY_RECOVERY_SECOND;
+        res.fullyExpires = (long) (System.currentTimeMillis()+(secondsUntilFullyHealed*TimeConstants.SECOND_MILLIS));
+        SpellEffectsEnum seff = SpellEffectsEnum.ITEM_DEBUFF_CLUMSINESS;
+        if(item.isShield()){
+            seff = SpellEffectsEnum.ITEM_DEBUFF_EXHAUSTION;
+        }
+        creature.getCommunicator().sendAddStatusEffect(seff, (int) secondsUntilFullyHealed);
+        //logger.info(String.format("Returning %.3f resistance for parry on item template %s", res.currentResistance, templateId));
+        return res.currentResistance;
+    }
+
+    public static long lastPolledParryResistance = 0;
+    public static final long pollParryResistanceTime = TimeConstants.SECOND_MILLIS;
+    public static void onServerPoll(){
+        if(lastPolledParryResistance + pollParryResistanceTime < System.currentTimeMillis()){
+            ArrayList<Creature> crets = new ArrayList<>(parryResistance.keySet());
+            for(Creature cret : crets){
+                ArrayList<ParryResistance> resists = parryResistance.get(cret);
+                int i = 0;
+                while(i < resists.size()){
+                    ParryResistance res = resists.get(i);
+                    if(res.fullyExpires < System.currentTimeMillis()){
+                        if(res.creature != null){
+                            SpellEffectsEnum seff = SpellEffectsEnum.ITEM_DEBUFF_CLUMSINESS;
+                            if(res.isShield){
+                                seff = SpellEffectsEnum.ITEM_DEBUFF_EXHAUSTION;
+                            }
+                            res.creature.getCommunicator().sendRemoveSpellEffect(seff);
+                        }
+                        resists.remove(i);
+                    }else {
+                        i++;
+                    }
+                }
+            }
+            lastPolledParryResistance = System.currentTimeMillis();
         }
     }
 
@@ -131,7 +214,7 @@ public class CombatHandled{
     protected byte currentStance=15; //Need to look into what stances are.
     protected byte currentStrength=1;//Depends on aggressive/normal/defensive style active currently.
     protected byte opportunityAttacks=0;//Need to look closely at how opportunities work.
-	protected HashSet<Item> secattacks;//Probably updates in other methods besides attackLoop.
+	//protected HashSet<Item> secattacks;//Probably updates in other methods besides attackLoop.
     //protected boolean turned = false; // No longer used, turning attacker instead of opponents.
 
     protected boolean crit = false;
@@ -182,8 +265,8 @@ public class CombatHandled{
             }
             opponent.addAttacker(attacker);
             float delta = Math.max(0.0f, actionCounter - this.lastTimeStamp);
-            if(delta<0.1) return false;
-            lastTimeStamp=actionCounter;
+            if(delta < 0.1) return false;
+            lastTimeStamp = actionCounter;
             Item weapon = attacker.getPrimWeapon();
             if (opponent.isPlayer()) {
                 attacker.setSecondsToLogout(300);
@@ -197,10 +280,10 @@ public class CombatHandled{
             this.currentStance = attacker.getCombatHandler().getCurrentStance(); // Required to set properly because it's adjusted in the CombatHandler through public methods.
             if (act != null && act.justTickedSecond()) {
                 // Sending combat status to the attacker.
-                //attacker.getCommunicator().sendCombatStatus(CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
+                //attacker.getCommunicator().sendCombatStatus(DUSKombat.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
                 try {
                     // Using ReflectionUtil to call a protected method with arguments.
-                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
+                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), DUSKombat.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
                 } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                     e.printStackTrace();
                 }
@@ -229,7 +312,7 @@ public class CombatHandled{
                 segments2.get(1).setText(" strikes ");
                 segments2.get(1).setText(" as you approach. ");
                 attacker.getCommunicator().sendColoredMessageCombat(segments2);
-                isDead = CombatHandled.attackHandled(opponent, attacker, combatCounter, true, 2.0f, null);
+                isDead = DUSKombat.attackHandled(opponent, attacker, combatCounter, true, 2.0f, null);
                 break stillAttacking;
             }*/
 
@@ -263,38 +346,45 @@ public class CombatHandled{
             }
 
             boolean performedAttack = false;
-            // TODO: Fix secondary weapon polling to make it less burst and more fluid
-            if (attacker.combatRound > 1) {
-                //Make sure we've actually been in combat a round.
-                for (Item lSecweapon : attacker.getSecondaryWeapons()) {
-                    if (attacker.opponent == null) continue; //this should be impossible, since creature.opponent==opponent is probably always true.
-                    if (this.secattacks == null) {
-                        this.secattacks = new HashSet<>();
-                    }
-                    if (this.secattacks.contains(lSecweapon) || (lSecweapon.getTemplateId() == 12 || lSecweapon.getTemplateId() == 17)) continue;
-                    float time = this.getSpeed(attacker, lSecweapon);
-                    float timer = attacker.addToWeaponUsed(lSecweapon, delta);
-                    if (isDead || attacker.combatRound % 2 != 1 || timer <= time) continue; //Every other round, seems bursty.
-                    attacker.deductFromWeaponUsed(lSecweapon, time);
-                    attacker.sendToLoggers("YOU SECONDARY " + lSecweapon.getName(), (byte) 2);
-                    opponent.sendToLoggers(attacker.getName() + " SECONDARY " + lSecweapon.getName() + "(" + lSecweapon.getWurmId() + ")", (byte) 2);
-                    attacker.setHugeMoveCounter(2 + Server.rand.nextInt(4));//Probably does nothing, but leaving in case.
-                    logger.info(String.format("> Secondary weapon swing timer for %s's %s has come up, performing swing (%.2f second swing timer, timer is at %.2f).", attacker.getName(), weapon.getName(), time, timer));
-                    isDead = this.swingWeapon(attacker, lSecweapon, opponent, true);
-                    if(isDead){
-                        setKillEffects(attacker, opponent);
-                    }
-                    performedAttack = true;
-                    this.secattacks.add(lSecweapon);
+            // Secondary weapon attacks
+            Item[] secweapons = attacker.getSecondaryWeapons();
+            for (Item lSecweapon : secweapons) {
+                if (attacker.opponent == null){
+                    continue; //this should be impossible, since creature.opponent==opponent is probably always true.
                 }
+                //if (lSecweapon.getTemplateId() == ItemList.bodyHead || lSecweapon.getTemplateId() == ItemList.bodyFace) continue; // Ignore face and head for secondary attacks
+                if(attacker.isPlayer() && weapon != null && lSecweapon.isBodyPartAttached()){
+                    continue; // Ignore weaponless secondary attacks if the player is using a weapon.
+                }
+                float timeMod = 1.2f + secweapons.length; // Creatures with lots of secondary weapons should be using them slower.
+                if(lSecweapon.getTemplateId() == ItemList.bodyHead){ // Add minor variation so all secondaries don't "spike" damage
+                    timeMod += 0.3f;
+                }
+                float time = this.getSpeed(attacker, lSecweapon) * timeMod; // Multiply to make secondary weapons slower.
+                float timer = attacker.addToWeaponUsed(lSecweapon, delta);
+                //if (isDead || attacker.combatRound % 2 != 1 || timer <= time) continue; //Every other round, seems bursty.
+                if(isDead || timer <= time) continue;
+                // Actually swing the secondary weapon
+                attacker.deductFromWeaponUsed(lSecweapon, time);
+                attacker.sendToLoggers("YOU SECONDARY " + lSecweapon.getName(), (byte) 2);
+                opponent.sendToLoggers(attacker.getName() + " SECONDARY " + lSecweapon.getName() + "(" + lSecweapon.getWurmId() + ")", (byte) 2);
+                attacker.setHugeMoveCounter(2 + Server.rand.nextInt(4));//Probably does nothing, but leaving in case.
+                //logger.info(String.format("> Secondary weapon swing timer for %s's %s has come up, performing swing (%.2f second swing timer, timer is at %.2f).", attacker.getName(), lSecweapon.getName(), time, timer));
+                isDead = this.swingWeapon(attacker, lSecweapon, opponent, true);
+                if(isDead){
+                    setKillEffects(attacker, opponent);
+                }
+                performedAttack = true;
+                //this.secattacks.add(lSecweapon);
             }
+            //}
             float time = this.getSpeed(attacker, weapon);
             float timer = attacker.addToWeaponUsed(weapon, delta);
             if (!isDead && timer > time){
                 attacker.deductFromWeaponUsed(weapon, time);
                 attacker.sendToLoggers("YOU PRIMARY " + weapon.getName(), (byte) 2);
                 opponent.sendToLoggers(attacker.getName() + " PRIMARY " + weapon.getName(), (byte) 2);
-                logger.info(String.format("> Weapon swing timer for %s's %s has come up, performing swing (%.2f second swing timer, timer is at %.2f).", attacker.getName(), weapon.getName(), time, timer));
+                //logger.info(String.format("> Weapon swing timer for %s's %s has come up, performing swing (%.2f second swing timer, timer is at %.2f).", attacker.getName(), weapon.getName(), time, timer));
                 isDead = this.swingWeapon(attacker, weapon, opponent, false);
                 if(isDead){
                     setKillEffects(attacker, opponent);
@@ -331,12 +421,60 @@ public class CombatHandled{
         return isDead;
     }
 
+    public static boolean blockSkillFrom(Creature attacker, Creature defender, double damage, float armourMod){
+        if(defender == null || attacker == null){
+            return false;
+        }
+        if(defender.isPlayer() && defender.getTarget() != attacker){
+            return true;
+        }
+        if(defender.isPlayer()){
+            Item weap = defender.getPrimWeapon();
+            if(weap != null && weap.isWeapon()){
+                double dam = DamageMethods.getBaseWeaponDamage(defender, attacker, defender.getPrimWeapon(), true);
+                if(attacker.getArmourMod() < 0.2f || attacker.getBaseCombatRating() > 20){
+                    return false;
+                }
+                if(dam * attacker.getArmourMod() < 3000){
+                    return true;
+                }
+            }else{
+                if(defender.getBonusForSpellEffect(Enchants.CRET_BEARPAW) < 50f){
+                    return true;
+                }
+            }
+        }
+        try {
+            if(defender.isPlayer() && attacker.getArmour(BodyPartConstants.TORSO) != null){
+                return true;
+            }
+        } catch (NoArmourException | NoSpaceException ignored) {
+        }
+        if(attacker.isPlayer()){
+            if(armourMod < 0.2f || defender.getBaseCombatRating() > 20){
+                return false;
+            }
+            if(damage * armourMod < 3000){
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean swingWeapon(Creature attacker, Item weapon, Creature opponent, boolean secondaryWeapon) {
         if (weapon.isWeaponBow()) {
             return false;
         }
 
-        logger.info(String.format("- %s vs %s -", attacker.getName(), opponent.getName()));
+        // Update currentStrength to latest value
+        try {
+            this.currentStrength = ReflectionUtil.getPrivateField(attacker.getCombatHandler(), ReflectionUtil.getField(attacker.getCombatHandler().getClass(), "currentStrength"));
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            logger.info(String.format("Failed to get currentStrength for %s from combat handler.", attacker.getName()));
+            e.printStackTrace();
+        }
+
+        //logger.info(String.format("- %s vs %s -", attacker.getName(), opponent.getName()));
 
         // Instead of having the opponent turn when they get attacked, we're going to turn the attacker when they swing.
         if(!attacker.isPlayer() || !attacker.hasLink()){
@@ -351,62 +489,85 @@ public class CombatHandled{
 
         byte pos = BodyTemplate.torso;
         try { // Obtain wound position based on their current targeting
-            //pos = this.getWoundPos(this.currentStance, opponent);
             pos = opponent.getBody().getRandomWoundPos(this.currentStance); // Inlined from getWoundPos
-        } catch (Exception var9) {
-            logger.log(Level.WARNING, attacker.getName() + " " + var9.getMessage(), var9);
+        } catch (Exception ex) {
+            logger.log(Level.WARNING, attacker.getName() + " " + ex.getMessage(), ex);
         }
 
         // Calculations for new combat system
-        double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon);
         byte type = this.getDamageType(attacker, weapon, false);
         double damage = DamageMethods.getDamage(this, attacker, weapon, opponent);
         //setAttString(attacker, weapon, type);
         attString = CombatEngine.getAttackString(attacker, weapon, type); // Inlined from setAttString
+        this.sendStanceAnimation(attacker, weapon, this.currentStance, true);
 
-        // Reduce stamina from the attacker slightly.
-        // TODO: Rescale this stamina modification
-        // Desired - 300 base stamina, +300 per 1kg of weapon.
-        // Reductions based on some other factors, such as whether in defensive or aggressive stance.
-        attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
+        float armourMod = getArmourMod(opponent, pos, type);
+
+        boolean noSkillGain = blockSkillFrom(attacker, opponent, damage, armourMod);
+        //logger.info("No skill gain = "+noSkillGain);
+
+        // Reduce stamina from the attacker on swing
+        //attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
+        float staminaCost = -300F - weapon.getWeightGrams() / 20F;
+        if(this.currentStrength == Style.AGGRESSIVE.id){
+            staminaCost *= 1.2f;
+        }else if(this.currentStrength == Style.DEFENSIVE.id){
+            staminaCost *= 0.8f;
+        }
+        attacker.getStatus().modifyStamina(staminaCost);
 
         // Ensure the attack didn't miss
-        logger.info(String.format("%s's attackCheck: %.2f", attacker.getName(), attackCheck));
+        double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon, noSkillGain);
+        //logger.info(String.format("[%s] %s's attackCheck: %.2f", attacker.getName(), attacker.getName(), attackCheck));
         if(attackCheck >= 0) {
             // Begin calculation for dodge.
             double dodgeCheck = CombatMethods.getDodgeCheck(attacker, opponent, weapon, attackCheck);
-            double stamDodgeMult = 0.5d*(100d-opponent.getStatus().calcStaminaPercent()); // Up to -50 penalty to the check based on stamina.
-            dodgeCheck -= stamDodgeMult;
-            logger.info(String.format("%s dodgeCheck: %.2f [-%.2f from stamina]", opponent.getName(), dodgeCheck, stamDodgeMult));
+            //logger.info(String.format("[%s] %s dodgeCheck: %.2f", attacker.getName(), opponent.getName(), dodgeCheck));
             if(dodgeCheck < 0){
                 // Begin calculation for critical strike
                 double critChance = CombatMethods.getCriticalChance(attacker, opponent, weapon);
                 double critRoll = Server.rand.nextDouble();
-                logger.info(String.format("%s critRoll: %.2f [%.2f%% chance]", attacker.getName(), critRoll*100d, critChance*100d));
+                //logger.info(String.format("[%s] %s critRoll: %.2f [%.2f%% chance]", attacker.getName(), attacker.getName(), critRoll*100d, critChance*100d));
                 if(critRoll <= critChance || attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
-                    logger.info(String.format("%s has landed a critical hit on %s! Applying double damage and skipping to damage calculations.", attacker.getName(), opponent.getName()));
+                    //logger.info(String.format("%s has landed a critical hit on %s! Applying double damage and skipping to damage calculations.", attacker.getName(), opponent.getName()));
                     if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
                         attacker.removeTrueStrike();
                     }
-                    damage *= 2.0D;
-                    dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
+                    damage *= 1.5D;
+                    dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, true);
                     return dead;
                 }else{
                     // Begin calculation for parry chance
                     double parryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck);
-                    logger.info(String.format("%s parryCheck: %.2f", opponent.getName(), parryCheck));
+                    double parryRes = updateParryResistance(opponent, opponent.getPrimWeapon(), 0);
+                    double parryReduction = (50*(1-parryRes));
+                    parryCheck -= parryReduction;
+                    //logger.info(String.format("[%s] %s parryCheck: %.2f [-%.2f from parry resistance]", attacker.getName(), opponent.getName(), parryCheck, parryReduction));
                     if(parryCheck < 0){
                         // Begin calculation for secondary parry or shield block
                         if(opponent.getShield() != null){
                             double shieldCheck = CombatMethods.getShieldCheck(attacker, opponent, weapon, attackCheck);
-                            logger.info(String.format("%s shieldCheck: %.2f", opponent.getName(), shieldCheck));
+                            double blockRes = updateParryResistance(opponent, opponent.getShield(), 0);
+                            double blockReduction = (80*(1-blockRes));
+                            shieldCheck -= blockReduction;
+                            //logger.info(String.format("[%s] %s shieldCheck: %.2f [-%.2f from block resistance]", attacker.getName(), opponent.getName(), shieldCheck, blockReduction));
                             if(shieldCheck < 0){
                                 // All damage avoidance failed.
-                                dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
+                                dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, false);
                                 return dead;
                             }else{
                                 // Shield block
-                                logger.info(String.format("%s blocks attack by %s. (Rolled %.2f)", opponent.getName(), attacker.getName(), shieldCheck));
+                                //logger.info(String.format("%s blocks attack by %s. (Rolled %.2f)", opponent.getName(), attacker.getName(), shieldCheck));
+                                Item defShield = opponent.getShield(); // Cannot be null because check occurs before calling this method.
+                                int defShieldSkillNum = SkillList.GROUP_SHIELDS;
+                                try {
+                                    defShieldSkillNum = defShield.getPrimarySkill();
+                                } catch (NoSuchSkillException ex) {
+                                    logger.warning(String.format("Could not find proper skill for shield %s. Resorting to Shields group skill.", defShield.getName()));
+                                }
+                                Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
+                                defShieldSkill.skillCheck(attackCheck, defShield, 0, noSkillGain, 10.0F);
+                                updateParryResistance(opponent, defShield, damage*0.0001);
                                 CombatMessages.playShieldBlockEffects(attacker, opponent, weapon, shieldCheck);
                                 return dead;
                             }
@@ -415,24 +576,36 @@ public class CombatHandled{
                             for(Item weap : opponent.getSecondaryWeapons()){
                                 if(!weap.isBodyPartAttached()){
                                     double secondaryParryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck*2);
-                                    logger.info(String.format("%s parryCheck with %s: %.2f", opponent.getName(), weap.getName(), secondaryParryCheck));
+                                    double secondaryParryRes = updateParryResistance(opponent, weap, 0);
+                                    double secondaryParryReduction = (100*(1-secondaryParryRes));
+                                    secondaryParryCheck -= secondaryParryReduction;
+                                    //logger.info(String.format("[%s] %s parryCheck with %s: %.2f [-%.2f from parry resistance]", attacker.getName(), opponent.getName(), weap.getName(), secondaryParryCheck, secondaryParryReduction));
                                     if(secondaryParryCheck > 0){
+                                        // Opponent parried the attack with a secondary
+                                        //Item defWeapon = opponent.getPrimWeapon();
+                                        Skill defWeaponSkill = DUSKombat.getCreatureWeaponSkill(opponent, weap);
+                                        defWeaponSkill.skillCheck(attackCheck, weap, 0, noSkillGain, 10.0f);
+                                        updateParryResistance(opponent, weap, damage*0.0001);
                                         CombatMessages.playParryEffects(attacker, opponent, weapon, secondaryParryCheck);
                                         return dead;
                                     }
                                 }
                             }
-                            logger.info(String.format("%s secondary weapons failed to parry. Proceeding to damage.", opponent.getName()));
-                            dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
+                            //logger.info(String.format("%s secondary weapons failed to parry. Proceeding to damage.", opponent.getName()));
+                            dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, false);
                             return dead;
                         }else{
                             // They have nothing else to defend themselves with, deal damage.
-                            logger.info("No further defenses available, moving to damage.");
-                            dead = this.dealDamage(attacker, opponent, weapon, damage, pos, type);
+                            //logger.info("No further defenses available, moving to damage.");
+                            dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, false);
                             return dead;
                         }
                     }else{
                         // Opponent parried the attack
+                        Item defWeapon = opponent.getPrimWeapon();
+                        Skill defWeaponSkill = DUSKombat.getCreatureWeaponSkill(opponent, defWeapon);
+                        defWeaponSkill.skillCheck(attackCheck, defWeapon, 0, noSkillGain, 10.0f);
+                        updateParryResistance(opponent, defWeapon, damage*0.0001);
                         CombatMessages.playParryEffects(attacker, opponent, weapon, parryCheck);
                         return dead;
                     }
@@ -507,9 +680,41 @@ public class CombatHandled{
         return woundType;
     }
 
-    //Copy pasta
-    public boolean dealDamage(Creature creature, Creature defender, Item attWeapon, double baseDamage, byte position, byte woundType) {
+    public float getArmourMod(Creature defender, byte position, byte woundType){
         float armourMod = defender.getArmourMod(); // Template armour
+        Item armour = null;
+        try {
+            armour = defender.getArmour((byte) Armour.getArmourPosForPos(position));
+        } catch (NoArmourException ignored) {
+        } catch (NoSpaceException e) {
+            logger.log(Level.WARNING, defender.getName() + " no armour space on loc " + position);
+            e.printStackTrace();
+        }
+        if(armour != null){
+            if(armourMod < 1.0f) { // Use the best DR between natural armour and worn armour if the creature has natural armour.
+                armourMod = Math.min(armourMod, Armour.getArmourModFor(armour, woundType));
+            }else{ // Multiply armour value by natural armour if they are supposed to take extra damage.
+                armourMod *= Armour.getArmourModFor(armour, woundType);
+            }
+        }else{
+            float omod = 100.0f;
+            float minmod = 0.6f;
+            if (!defender.isPlayer()) {
+                omod = 300.0f;
+                minmod = 0.6f;
+            }
+            float oakshellPower = defender.getBonusForSpellEffect(Enchants.CRET_OAKSHELL);
+            if (armourMod >= 1.0f) {
+                armourMod = 0.2f + (float)(1.0 - Server.getBuffedQualityEffect(oakshellPower / omod)) * minmod;
+            } else {
+                armourMod = Math.min(armourMod, 0.2f + (float)(1.0 - Server.getBuffedQualityEffect(oakshellPower / omod)) * minmod);
+            }
+        }
+        return armourMod;
+    }
+
+    //Copy pasta
+    public boolean dealDamage(Creature creature, Creature defender, Item attWeapon, double baseDamage, float armourMod, byte position, byte woundType, boolean blockSkill, boolean critical) {
         Item armour = null;
         boolean metalArmour = false;
         try {
@@ -522,13 +727,8 @@ public class CombatHandled{
 
         float bounceWoundPower = 0.0f;
         String bounceWoundName = "";
+        boolean glance = false;
         if(armour != null){
-            if(armourMod < 1.0f) { // Use the best DR between natural armour and worn armour if the creature has natural armour.
-                armourMod = Math.min(armourMod, Armour.getArmourModFor(armour, woundType));
-            }else{ // Multiply armour value by natural armour if they are supposed to take extra damage.
-                armourMod *= Armour.getArmourModFor(armour, woundType);
-            }
-
             // Calculate damage dealt to the armour
             float baseArmourDamage = (float) (baseDamage * Weapon.getMaterialArmourDamageBonus(attWeapon.getMaterial()));
             float woundTypeMultiplier = Armour.getArmourDamageModFor(armour, woundType);
@@ -546,24 +746,28 @@ public class CombatHandled{
                 metalArmour = true;
             }
 
+            // Glancing strike
+            float baseGlanceRate = 0.05f;
+            float armourGlanceModifier = ArmourTypes.getArmourGlanceModifier(armour.getArmourType(), armour.getMaterial(), woundType);
+            float glanceChance = baseGlanceRate + armourGlanceModifier * (float)Server.getBuffedQualityEffect(armour.getCurrentQualityLevel() / 100.0f);
+            float glanceRoll = Server.rand.nextFloat();
+            //logger.info(String.format("%s glance chance: %.2f [%.2f roll]", defender.getName(), glanceChance, glanceRoll));
+            if(glanceRoll < glanceChance){
+                // Attack glances
+                glance = true;
+                double reduction = (150-armour.getCurrentQualityLevel())/150;
+                //logger.info(String.format("Glance from %s multiplies damage by %.2f%%", armour.getName(), reduction));
+                baseDamage *= reduction;
+            }
+
+            // Logger stuff
             defender.sendToLoggers("YOU ARMORMOD " + armourMod, (byte) 2);
             creature.sendToLoggers(defender.getName() + " ARMORMOD " + armourMod, (byte) 2);
         }else{
-            float omod = 100.0f;
-            float minmod = 0.6f;
-            if (!defender.isPlayer()) {
-                omod = 300.0f;
-                minmod = 0.6f;
-            }
             float oakshellPower = defender.getBonusForSpellEffect(Enchants.CRET_OAKSHELL);
             if (oakshellPower > 70.0f) {
                 bounceWoundPower = oakshellPower;
                 bounceWoundName = "Thornshell";
-            }
-            if (armourMod >= 1.0f) {
-                armourMod = 0.2f + (float)(1.0 - Server.getBuffedQualityEffect(oakshellPower / omod)) * minmod;
-            } else {
-                armourMod = Math.min(armourMod, 0.2f + (float)(1.0 - Server.getBuffedQualityEffect(oakshellPower / omod)) * minmod);
             }
         }
 
@@ -593,22 +797,29 @@ public class CombatHandled{
             defdamage *= 0.9;
         }
 
-        // TODO: WTF is this?
-        /*if (defender.getTemplate().isTowerBasher() && (creature.isSpiritGuard() || creature.isKingdomGuard())) {
-            float mod = 1.0f / defender.getArmourMod();
-            defdamage = Math.max((double)((float)(500 + Server.rand.nextInt(1000)) * mod), defdamage);
-        }*/
-
         if (DamageMethods.canDealDamage(defdamage, armourMod)) {
             float champMod = defender.isChampion() ? 0.4f : 1.0f;
             Battle battle = defender.getBattle();
             dead = false;
+
+            // Apply skill gain
+            Skill fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_NORMALSTYLE);
+            if(this.currentStrength == Style.AGGRESSIVE.id){
+                fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_AGGRESSIVESTYLE);
+            }else if(this.currentStrength == Style.DEFENSIVE.id){
+                fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_DEFENSIVESTYLE);
+            }
+            fstyle.skillCheck(0, 0, blockSkill, 10f);
+
+            // Venom
             float poisdam = attWeapon.getSpellVenomBonus();
             if (poisdam > 0.0f) {
                 float half = Math.max(1.0f, poisdam / 2.0f);
                 poisdam = half + (float)Server.rand.nextInt((int)half);
                 defdamage *= 0.8;
             }
+
+            // Untame uniques that are fighting eachother.
             if (defender.isUnique() && creature.isUnique() && defender.getStatus().damage > 10000) {
                 defender.setTarget(-10, true);
                 creature.setTarget(-10, true);
@@ -662,7 +873,8 @@ public class CombatHandled{
             }
 
             // Deal the initial wound
-            dead = CombatEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false);
+            //dead = CombatEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false);
+            dead = DamageEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false, false, attWeapon, critical, glance);
 
             // BONK! achievement check
             if (attWeapon.isWeaponCrush() && attWeapon.getWeightGrams() > 4000 && armour != null && armour.getTemplateId() == ItemList.helmetGreat) {
@@ -675,13 +887,12 @@ public class CombatHandled{
                 if(w.length > 0) { // Ensure the player has at least one wound.
                     float lifeTransferPower = attWeapon.getSpellLifeTransferModifier();
                     if(lifeTransferPower > 0) {
-                        float lifeTransferChampMod = creature.isChampion() ? 1000.0f : 500.0f;
+                        float lifeTransferChampMod = creature.isChampion() ? 500.0f : 250.0f;
                         if(creature.getCultist() != null && creature.getCultist().healsFaster()){
                             lifeTransferChampMod *= 0.5f;
                         }
                         float lifeTransferDamageHealed = ((float) defdamage) * armourMod * lifeTransferPower / lifeTransferChampMod;
-                        int dmgBefore = defender.getStatus().damage;
-                        if (dmgBefore != defender.getStatus().damage && DamageMethods.canDealDamage(lifeTransferDamageHealed, armourMod)) {
+                        if (DamageMethods.canDealDamage(lifeTransferDamageHealed, armourMod)) {
                             byte type = w[0].getType();
                             if(type == Wound.TYPE_BURN || type == Wound.TYPE_COLD || type == Wound.TYPE_ACID){ // Elemental wounds heal 50% slower
                                 lifeTransferDamageHealed *= 0.5f;
@@ -719,6 +930,7 @@ public class CombatHandled{
             if(flamingAuraPower > 0) {
                 double flamingAuraDamage = defdamage * flamingAuraPower * 0.0035d; // 0.35% damage per power
                 if (!dead && DamageMethods.canDealDamage(flamingAuraDamage, armourMod)) {
+                    //dead = DamageEngine.addWound(creature, defender, Wound.TYPE_BURN, position, flamingAuraDamage, armourMod, "ignite", battle, 0, 0, false, false);
                     dead = defender.addWoundOfType(creature, Wound.TYPE_BURN, position, false, armourMod, false, flamingAuraDamage);
                 }
             }
@@ -752,8 +964,8 @@ public class CombatHandled{
                 }
                 if (creature.isUnique()) { // Uniques ignore effects of AOSP/Thornshell always.
                     CombatMessages.sendBounceWoundIgnoreMessages(creature, defender, bounceWoundName);
-                }else if (DamageMethods.canDealDamage(bounceDamage, spellResist)) {
-                    dead = CombatEngine.addBounceWound(defender, creature, woundType, position, bounceDamage, armourMod);
+                }else if (DamageMethods.canDealDamage(bounceDamage, spellResist)) { // Doesn't use "dead" because affecting attacker
+                    CombatEngine.addBounceWound(defender, creature, woundType, position, bounceDamage, armourMod);
                 }
             }
 
@@ -1026,7 +1238,7 @@ public class CombatHandled{
         if (attacker.hasSpellEffect(Enchants.CRET_KARMASLOW)) {
             calcspeed *= 2.0f; //Karma Slow
         }
-        return Math.max(CombatHandledMod.minimumSwingTimer, calcspeed);
+        return Math.max(DUSKombatMod.minimumSwingTimer, calcspeed);
     }
     //Copy pasta
     protected float getWeaponSpeed(Creature attacker, Item _weapon) {
@@ -1057,13 +1269,13 @@ public class CombatHandled{
         if (opponent == null) {
             return 1.0F;
         } else {
-            float attAngle = this.getDirectionTo(attacker, opponent);
+            float attAngle = getDirectionTo(attacker, opponent);
             if (opponent.getVehicle() > -10L) {
                 Vehicle vehic = Vehicles.getVehicleForId(opponent.getVehicle());
                 if (vehic != null && vehic.isCreature()) {
                     try {
                         Creature ridden = Server.getInstance().getCreature(opponent.getVehicle());
-                        attAngle = this.getDirectionTo(attacker, ridden);
+                        attAngle = getDirectionTo(attacker, ridden);
                     } catch (Exception var5) {
                         logger.log(Level.INFO, "No creature for id " + opponent.getVehicle());
                     }
@@ -1290,8 +1502,8 @@ public class CombatHandled{
                     if (defender.mayRaiseFightLevel()) {
                         e = Actions.actionEntrys[340];
                     }
-                } else if (defender.opponent == opponent && (e = CombatHandled.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
-                    e = CombatHandled.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                } else if (defender.opponent == opponent && (e = DUSKombat.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
+                    e = DUSKombat.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                 }
             }
             if (e == null) {
@@ -1300,18 +1512,18 @@ public class CombatHandled{
                         e = Actions.actionEntrys[340];
                     }
                 } else if (mycr - oppcr > 2.0f || getCombatHandled(defender).getSpeed(defender, defender.getPrimWeapon()) < 3.0f) {
-                    if (CombatHandled.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandled.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                        e = CombatHandled.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                    if (DUSKombat.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = DUSKombat.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                        e = DUSKombat.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                     }
                 } else if (mycr >= oppcr) {
                     if (defender.getStatus().damage < opponent.getStatus().damage) {
-                        if (CombatHandled.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandled.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                            e = CombatHandled.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        if (DUSKombat.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = DUSKombat.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                            e = DUSKombat.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     } else {
-                        e = CombatHandled.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        e = DUSKombat.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         if (e == null) {
-                            e = CombatHandled.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                            e = DUSKombat.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     }
                 }
@@ -1331,7 +1543,7 @@ public class CombatHandled{
                     if (e.getNumber() == 105) {
                         defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                     } else if (e.isStanceChange() && e.getNumber() != 340) {
-                        if (CombatHandled.getStanceForAction(e) != this.currentStance) {
+                        if (DUSKombat.getStanceForAction(e) != this.currentStance) {
                             defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                         }
                     } else if (defender.mayRaiseFightLevel() && e.getNumber() == 340) {
@@ -1386,13 +1598,13 @@ public class CombatHandled{
     //Copy pasta
     protected List<ActionEntry> getLowAttacks(Item weapon, boolean auto, Creature attacker, Creature opponent, float mycr, float oppcr, float primweaponskill) {
         LinkedList<ActionEntry> tempList = new LinkedList<>();
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 297)) {
+        if (primweaponskill > (float)DUSKombat.getAttackSkillCap((short) 297)) {
             this.addToList(tempList, weapon, (short) 297, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 294)) {
+        if (primweaponskill > (float)DUSKombat.getAttackSkillCap((short) 294)) {
             this.addToList(tempList, weapon, (short) 294, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandled.getAttackSkillCap((short) 312)) {
+        if (primweaponskill > (float)DUSKombat.getAttackSkillCap((short) 312)) {
             this.addToList(tempList, weapon, (short) 312, attacker, opponent, mycr, oppcr, primweaponskill);
         }
         if (!auto && tempList.size() > 0) {
@@ -1427,9 +1639,6 @@ public class CombatHandled{
             }
         }
     }
-
-
-
 
     //Copy pasta
     protected boolean isOpen() {
@@ -1513,7 +1722,7 @@ public class CombatHandled{
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandled.isStanceParrying(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (!DUSKombat.isStanceParrying(DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombat.isAtSoftSpot(DUSKombat.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -1523,7 +1732,7 @@ public class CombatHandled{
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandled.isStanceOpposing(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (!DUSKombat.isStanceOpposing(DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombat.isAtSoftSpot(DUSKombat.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -1533,7 +1742,7 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            if (CombatHandled.isStanceParrying(CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandled.isStanceOpposing(CombatHandled.getStanceForAction(e), opponentStance) || CombatHandled.isAtSoftSpot(CombatHandled.getStanceForAction(e), opponentStance)) continue;
+            if (DUSKombat.isStanceParrying(DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombat.isStanceOpposing(DUSKombat.getStanceForAction(e), opponentStance) || DUSKombat.isAtSoftSpot(DUSKombat.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -1698,13 +1907,13 @@ public class CombatHandled{
     }
     //Copy pasta
     protected static boolean isNextGoodStance(byte currentStance, byte nextStance, byte opponentStance) {
-        if (CombatHandled.isAtSoftSpot(nextStance, opponentStance)) {
+        if (DUSKombat.isAtSoftSpot(nextStance, opponentStance)) {
             return false;
         }
-        if (CombatHandled.isAtSoftSpot(opponentStance, currentStance)) {
+        if (DUSKombat.isAtSoftSpot(opponentStance, currentStance)) {
             return false;
         }
-        if (CombatHandled.isAtSoftSpot(opponentStance, nextStance)) {
+        if (DUSKombat.isAtSoftSpot(opponentStance, nextStance)) {
             return true;
         }
         if (currentStance == 0) {
@@ -1743,7 +1952,7 @@ public class CombatHandled{
     //Copy pasta
     protected static boolean isAtSoftSpot(byte stanceChecked, byte stanceUnderAttack) {
         byte[] opponentSoftSpots;
-        for (byte spot : opponentSoftSpots = CombatHandled.getSoftSpots(stanceChecked)) {
+        for (byte spot : opponentSoftSpots = DUSKombat.getSoftSpots(stanceChecked)) {
             if (spot != stanceUnderAttack) continue;
             return true;
         }
@@ -1776,16 +1985,16 @@ public class CombatHandled{
     }
     //Copy pasta;  It appears as though isNextGoodStance calls in this method uses wrong argument order.
     protected static boolean existsBetterOffensiveStance(byte _currentStance, byte opponentStance) {
-        if (CombatHandled.isAtSoftSpot(opponentStance, _currentStance)) {
+        if (DUSKombat.isAtSoftSpot(opponentStance, _currentStance)) {
             return false;
         }
-        boolean isOpponentAtSoftSpot = CombatHandled.isAtSoftSpot(_currentStance, opponentStance);
-        if (isOpponentAtSoftSpot || !CombatHandled.isStanceParrying(_currentStance, opponentStance) && !CombatHandled.isStanceOpposing(_currentStance, opponentStance)) {
+        boolean isOpponentAtSoftSpot = DUSKombat.isAtSoftSpot(_currentStance, opponentStance);
+        if (isOpponentAtSoftSpot || !DUSKombat.isStanceParrying(_currentStance, opponentStance) && !DUSKombat.isStanceOpposing(_currentStance, opponentStance)) {
             for (int x = 0; x < selectStanceList.size(); ++x) {
                 int num = Server.rand.nextInt(selectStanceList.size());
                 ActionEntry e = selectStanceList.get(num);
-                byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-                if (!CombatHandled.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+                byte nextStance = DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+                if (!DUSKombat.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
                 return true;
             }
             return false;
@@ -1793,8 +2002,8 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (CombatHandled.isStanceParrying(_currentStance, nextStance) || CombatHandled.isStanceOpposing(_currentStance, nextStance)) continue;
+            byte nextStance = DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (DUSKombat.isStanceParrying(_currentStance, nextStance) || DUSKombat.isStanceOpposing(_currentStance, nextStance)) continue;
             return true;
         }
         return false;
@@ -1804,8 +2013,8 @@ public class CombatHandled{
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandled.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (!CombatHandled.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+            byte nextStance = DUSKombat.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (!DUSKombat.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
             return e;
         }
         return null;
@@ -1818,7 +2027,7 @@ public class CombatHandled{
             return idealDist - dist;
         }
         Item wpn = creature.getPrimWeapon();
-        return CombatHandled.getDistdiff(wpn, creature, opponent);
+        return DUSKombat.getDistdiff(wpn, creature, opponent);
     }
     //Copy pasta
     protected static float getDistdiff(Item weapon, Creature creature, Creature opponent) {
@@ -1827,7 +2036,7 @@ public class CombatHandled{
         return idealDist - dist;
     }
     //Copy pasta
-    public void sendStanceAnimation(Creature attacker, byte aStance, boolean attack) {
+    public void sendStanceAnimation(Creature attacker, Item weapon, byte aStance, boolean attack) {
         if (aStance == 8) {
             attacker.sendToLoggers(attacker.getName() + ": " + "stancerebound", (byte)2);
             attacker.playAnimation("stancerebound", false);
@@ -1837,18 +2046,28 @@ public class CombatHandled{
             attacker.sendToLoggers(attacker.getName() + ": " + "stanceopen", (byte)2);
         } else {
             StringBuilder sb = new StringBuilder();
-            sb.append("fight");
+            if(attack) {
+                sb.append(CombatMessages.getAttackAnimationString(attacker, weapon, attString));
+            }else{
+                sb.append("fight");
+            }
+            /*sb.append("fight");
             if (attack) {
+                if(weapon.isBodyPartAttached()){
+                    if(attString.equals("headbutt")){
+                        sb.append("_headbutt");
+                    }
+                }
                 if (attString.equals("hit")) {
                     sb.append("_strike");
-                } else {
+                } else if(attString.equals("pierce")) {
                     sb.append("_" + attString);
                 }
-            }
+            }*/
 
-            if (!attacker.isUnique() || attacker.getHugeMoveCounter() == 2) {
+            //if (!attacker.isUnique() || attacker.getHugeMoveCounter() == 2) {
                 attacker.playAnimation(sb.toString(), !attack);
-            }
+            //}
 
             attacker.sendToLoggers(attacker.getName() + ": " + sb.toString(), (byte)2);
         }

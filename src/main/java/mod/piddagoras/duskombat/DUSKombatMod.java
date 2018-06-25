@@ -1,4 +1,4 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.creatures.Creature;
 import com.wurmonline.server.creatures.Creatures;
@@ -16,9 +16,9 @@ import org.gotti.wurmunlimited.modloader.interfaces.*;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-public class CombatHandledMod
-implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListener, ServerStartedListener {
-	public static Logger logger = Logger.getLogger(CombatHandledMod.class.getName());
+public class DUSKombatMod
+implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListener, ServerStartedListener, ServerPollListener {
+	public static Logger logger = Logger.getLogger(DUSKombatMod.class.getName());
 
 	public static float minimumSwingTimer = 3.0f;
 	public static boolean useEpicBloodthirst = true;
@@ -88,7 +88,7 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 		logger.info("Beginning preInit...");
         try{
             ClassPool classPool = HookManager.getInstance().getClassPool();
-            final Class<CombatHandledMod> thisClass = CombatHandledMod.class;
+            final Class<DUSKombatMod> thisClass = DUSKombatMod.class;
             String replace;
 
 		    Util.setReason("Debug attack method");
@@ -104,13 +104,13 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
             };
             String desc4 = Descriptor.ofMethod(CtClass.booleanType, params4);
             replace = "{" +
-                    "  return "+CombatHandled.class.getName()+".attackHandled($0.creature, $1, $2, $3, $4, $5);" +
+                    "  return "+DUSKombat.class.getName()+".attackHandled($0.creature, $1, $2, $3, $4, $5);" +
                     "}";
             Util.setBodyDescribed(thisClass, ctCombatHandler, "attack", desc4, replace);
 
             Util.setReason("Poll creature action stacks on every update.");
             CtClass ctZones = classPool.get("com.wurmonline.server.zones.Zones");
-            replace = CombatHandledMod.class.getName()+".pollCreatureActionStacks();";
+            replace = DUSKombatMod.class.getName()+".pollCreatureActionStacks();";
             Util.insertBeforeDeclared(thisClass, ctZones, "pollNextZones", replace);
 
             Util.setReason("Insert examine method.");
@@ -140,9 +140,39 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
             };
             String desc1 = Descriptor.ofMethod(CtClass.booleanType, params1);
             replace = "{" +
-                    " return "+DamageEngine.class.getName()+".addWound($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);" +
+                    " return "+DamageEngine.class.getName()+".addWound($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, null, false, false);" +
                     "}";
             Util.setBodyDescribed(thisClass, ctCombatEngine, "addWound", desc1, replace);
+
+            Util.setReason("Overwrite sending special move information.");
+            replace = "{" +
+                    SpecialMoves.class.getName()+".sendSpecialMoves($0.creature);" +
+                    "}";
+            Util.setBodyDeclared(thisClass, ctCombatHandler, "sendSpecialMoves", replace);
+
+            Util.setReason("Overwrite actual special move handling");
+            CtClass ctCreatureBehaviour = classPool.get("com.wurmonline.server.behaviours.CreatureBehaviour");
+            replace = "{" +
+                    "return "+SpecialMoves.class.getName()+".handleSpecialMove($1, $2, $3, $4);" +
+                    "}";
+            Util.setBodyDeclared(thisClass, ctCreatureBehaviour, "handle_SPECMOVE", replace);
+
+            // Trigger Testing
+            /*Trigger.Register(new Trigger("Cold Damage Taken", Event.DamageTaken,
+                    new Circumstances(){
+                        @Override
+                        public boolean check(Map<String, Object> data) {
+                            byte type = (byte) data.get("type");
+                            logger.info(String.format("Checking type %s for trigger.", type));
+                            return type == Wound.TYPE_COLD;
+                        }
+                    },
+                    new Consequences(){
+                        @Override
+                        public void call (Map<String, Object> data){
+                            logger.info(String.format("Took some cold damage! %s", data.get("type")));
+                        }
+                    }));*/
 
         } catch ( NotFoundException | IllegalArgumentException | ClassCastException e) {
             throw new HookException(e);
@@ -158,4 +188,9 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	public void onServerStarted(){
 		logger.info("Beginning onServerStarted...");
 	}
+
+    @Override
+    public void onServerPoll() {
+        DUSKombat.onServerPoll();
+    }
 }

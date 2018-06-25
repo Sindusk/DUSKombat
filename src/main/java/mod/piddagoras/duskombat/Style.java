@@ -1,4 +1,4 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
 public enum Style {
     DEFENSIVE(0),

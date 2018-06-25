@@ -1,4 +1,4 @@
-package mod.piddagoras.combathandled;
+package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.*;
 import com.wurmonline.server.behaviours.*;
@@ -100,27 +100,27 @@ ActionEntries
     public static final short DEFEND_LOW = 316;
     public static final short DEFEND_RIGHT = 317;
 */
-public class CombatHandledOld {
-    public static final Logger logger = Logger.getLogger(CombatHandledOld.class.getName());
-    public static HashMap<Creature, CombatHandledOld> combatMap = new HashMap<>();
+public class DUSKombatOld {
+    public static final Logger logger = Logger.getLogger(DUSKombatOld.class.getName());
+    public static HashMap<Creature, DUSKombatOld> combatMap = new HashMap<>();
 
     public static boolean attackHandled(Creature attacker, Creature opponent, int combatCounter, boolean opportunity, float actionCounter, Action act) {
-        CombatHandledOld ch;
+        DUSKombatOld ch;
         if(combatMap.containsKey(attacker)){
             ch = combatMap.get(attacker);
         }else{
-            ch = new CombatHandledOld();
+            ch = new DUSKombatOld();
             combatMap.put(attacker, ch);
         }
         //logger.info(String.format("Running attack loop for attacker %s against %s, counter = %.2f", attacker.getName(), opponent.getName(), actionCounter));
         return ch.attackLoop(attacker, opponent, combatCounter, opportunity, actionCounter, act);
     }
 
-    public static CombatHandledOld getCombatHandled(Creature creature){
+    public static DUSKombatOld getCombatHandled(Creature creature){
         if(combatMap.containsKey(creature)){
             return combatMap.get(creature);
         }else{
-            CombatHandledOld ch = new CombatHandledOld();
+            DUSKombatOld ch = new DUSKombatOld();
             combatMap.put(creature, ch);
             return ch;
         }
@@ -196,10 +196,10 @@ public class CombatHandledOld {
             this.currentStance = attacker.getCombatHandler().getCurrentStance(); // Required to set properly because it's adjusted in the CombatHandler through public methods.
             if (act != null && act.justTickedSecond()) {
                 // Sending combat status to the attacker.
-                //attacker.getCommunicator().sendCombatStatus(CombatHandled.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
+                //attacker.getCommunicator().sendCombatStatus(DUSKombat.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);//Should maybe Hijack this and send different data.
                 try {
                     // Using ReflectionUtil to call a protected method with arguments.
-                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), CombatHandledOld.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
+                    ReflectionUtil.callPrivateMethod(attacker.getCommunicator(), ReflectionUtil.getMethod(attacker.getCommunicator().getClass(), "sendCombatStatus"), DUSKombatOld.getDistdiff(weapon, attacker, opponent), this.getFootingModifier(attacker, weapon, opponent), this.currentStance);
                 } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                     e.printStackTrace();
                 }
@@ -226,7 +226,7 @@ public class CombatHandledOld {
                 segments2.get(1).setText(" strikes ");
                 segments2.get(1).setText(" as you approach. ");
                 attacker.getCommunicator().sendColoredMessageCombat(segments2);
-                isDead = CombatHandled.attackHandled(opponent, attacker, combatCounter, true, 2.0f, null);
+                isDead = DUSKombat.attackHandled(opponent, attacker, combatCounter, true, 2.0f, null);
                 break stillAttacking;
             }*/
 
@@ -328,7 +328,7 @@ public class CombatHandledOld {
             }
 
             // Calculations for new combat system
-            double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon);
+            double attackCheck = CombatMethods.getHitCheck(attacker, opponent, weapon, false);
             attacker.getCommunicator().sendNormalServerMessage(String.format("Attack Check: %.2f", attackCheck));
             byte type=this.getType(attacker, weapon, false);
             double damage=this.getDamage(attacker, weapon, opponent);
@@ -1503,7 +1503,7 @@ public class CombatHandledOld {
         if (attacker.hasSpellEffect(Enchants.CRET_KARMASLOW)) {
             calcspeed *= 2.0f; //Karma Slow
         }
-        return Math.max(CombatHandledMod.minimumSwingTimer, calcspeed);
+        return Math.max(DUSKombatMod.minimumSwingTimer, calcspeed);
     }
     //Copy pasta
     protected float getWeaponSpeed(Creature attacker, Item _weapon) {
@@ -1826,8 +1826,8 @@ public class CombatHandledOld {
                     if (defender.mayRaiseFightLevel()) {
                         e = Actions.actionEntrys[340];
                     }
-                } else if (defender.opponent == opponent && (e = CombatHandledOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
-                    e = CombatHandledOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                } else if (defender.opponent == opponent && (e = DUSKombatOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance)) == null) {
+                    e = DUSKombatOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                 }
             }
             if (e == null) {
@@ -1836,18 +1836,18 @@ public class CombatHandledOld {
                         e = Actions.actionEntrys[340];
                     }
                 } else if (mycr - oppcr > 2.0f || getCombatHandled(defender).getSpeed(defender, defender.getPrimWeapon()) < 3.0f) {
-                    if (CombatHandledOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandledOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                        e = CombatHandledOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                    if (DUSKombatOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = DUSKombatOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                        e = DUSKombatOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                     }
                 } else if (mycr >= oppcr) {
                     if (defender.getStatus().damage < opponent.getStatus().damage) {
-                        if (CombatHandledOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = CombatHandledOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
-                            e = CombatHandledOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        if (DUSKombatOld.existsBetterOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance) && (e = DUSKombatOld.changeToBestOffensiveStance(getCombatHandled(defender).currentStance, getCombatHandled(opponent).currentStance)) == null) {
+                            e = DUSKombatOld.getNonDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     } else {
-                        e = CombatHandledOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
+                        e = DUSKombatOld.getDefensiveActionEntry(getCombatHandled(opponent).currentStance);
                         if (e == null) {
-                            e = CombatHandledOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
+                            e = DUSKombatOld.getOpposingActionEntry(getCombatHandled(opponent).currentStance);
                         }
                     }
                 }
@@ -1867,7 +1867,7 @@ public class CombatHandledOld {
                     if (e.getNumber() == 105) {
                         defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                     } else if (e.isStanceChange() && e.getNumber() != 340) {
-                        if (CombatHandledOld.getStanceForAction(e) != this.currentStance) {
+                        if (DUSKombatOld.getStanceForAction(e) != this.currentStance) {
                             defender.setAction(new Action(defender, -1, opponent.getWurmId(), e.getNumber(), defender.getPosX(), defender.getPosY(), defender.getPositionZ() + defender.getAltOffZ(), defender.getStatus().getRotation()));
                         }
                     } else if (defender.mayRaiseFightLevel() && e.getNumber() == 340) {
@@ -1922,13 +1922,13 @@ public class CombatHandledOld {
     //Copy pasta
     protected List<ActionEntry> getLowAttacks(Item weapon, boolean auto, Creature attacker, Creature opponent, float mycr, float oppcr, float primweaponskill) {
         LinkedList<ActionEntry> tempList = new LinkedList<>();
-        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 297)) {
+        if (primweaponskill > (float)DUSKombatOld.getAttackSkillCap((short) 297)) {
             this.addToList(tempList, weapon, (short) 297, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 294)) {
+        if (primweaponskill > (float)DUSKombatOld.getAttackSkillCap((short) 294)) {
             this.addToList(tempList, weapon, (short) 294, attacker, opponent, mycr, oppcr, primweaponskill);
         }
-        if (primweaponskill > (float)CombatHandledOld.getAttackSkillCap((short) 312)) {
+        if (primweaponskill > (float)DUSKombatOld.getAttackSkillCap((short) 312)) {
             this.addToList(tempList, weapon, (short) 312, attacker, opponent, mycr, oppcr, primweaponskill);
         }
         if (!auto && tempList.size() > 0) {
@@ -2049,7 +2049,7 @@ public class CombatHandledOld {
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandledOld.isStanceParrying(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
+            if (!DUSKombatOld.isStanceParrying(DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombatOld.isAtSoftSpot(DUSKombatOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2059,7 +2059,7 @@ public class CombatHandledOld {
         ListIterator<ActionEntry> it = selectStanceList.listIterator();
         while (it.hasNext()) {
             ActionEntry e = it.next();
-            if (!CombatHandledOld.isStanceOpposing(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
+            if (!DUSKombatOld.isStanceOpposing(DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombatOld.isAtSoftSpot(DUSKombatOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2069,7 +2069,7 @@ public class CombatHandledOld {
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            if (CombatHandledOld.isStanceParrying(CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || CombatHandledOld.isStanceOpposing(CombatHandledOld.getStanceForAction(e), opponentStance) || CombatHandledOld.isAtSoftSpot(CombatHandledOld.getStanceForAction(e), opponentStance)) continue;
+            if (DUSKombatOld.isStanceParrying(DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]), opponentStance) || DUSKombatOld.isStanceOpposing(DUSKombatOld.getStanceForAction(e), opponentStance) || DUSKombatOld.isAtSoftSpot(DUSKombatOld.getStanceForAction(e), opponentStance)) continue;
             return e;
         }
         return null;
@@ -2234,13 +2234,13 @@ public class CombatHandledOld {
     }
     //Copy pasta
     protected static boolean isNextGoodStance(byte currentStance, byte nextStance, byte opponentStance) {
-        if (CombatHandledOld.isAtSoftSpot(nextStance, opponentStance)) {
+        if (DUSKombatOld.isAtSoftSpot(nextStance, opponentStance)) {
             return false;
         }
-        if (CombatHandledOld.isAtSoftSpot(opponentStance, currentStance)) {
+        if (DUSKombatOld.isAtSoftSpot(opponentStance, currentStance)) {
             return false;
         }
-        if (CombatHandledOld.isAtSoftSpot(opponentStance, nextStance)) {
+        if (DUSKombatOld.isAtSoftSpot(opponentStance, nextStance)) {
             return true;
         }
         if (currentStance == 0) {
@@ -2279,7 +2279,7 @@ public class CombatHandledOld {
     //Copy pasta
     protected static boolean isAtSoftSpot(byte stanceChecked, byte stanceUnderAttack) {
         byte[] opponentSoftSpots;
-        for (byte spot : opponentSoftSpots = CombatHandledOld.getSoftSpots(stanceChecked)) {
+        for (byte spot : opponentSoftSpots = DUSKombatOld.getSoftSpots(stanceChecked)) {
             if (spot != stanceUnderAttack) continue;
             return true;
         }
@@ -2312,16 +2312,16 @@ public class CombatHandledOld {
     }
     //Copy pasta;  It appears as though isNextGoodStance calls in this method uses wrong argument order.
     protected static boolean existsBetterOffensiveStance(byte _currentStance, byte opponentStance) {
-        if (CombatHandledOld.isAtSoftSpot(opponentStance, _currentStance)) {
+        if (DUSKombatOld.isAtSoftSpot(opponentStance, _currentStance)) {
             return false;
         }
-        boolean isOpponentAtSoftSpot = CombatHandledOld.isAtSoftSpot(_currentStance, opponentStance);
-        if (isOpponentAtSoftSpot || !CombatHandledOld.isStanceParrying(_currentStance, opponentStance) && !CombatHandledOld.isStanceOpposing(_currentStance, opponentStance)) {
+        boolean isOpponentAtSoftSpot = DUSKombatOld.isAtSoftSpot(_currentStance, opponentStance);
+        if (isOpponentAtSoftSpot || !DUSKombatOld.isStanceParrying(_currentStance, opponentStance) && !DUSKombatOld.isStanceOpposing(_currentStance, opponentStance)) {
             for (int x = 0; x < selectStanceList.size(); ++x) {
                 int num = Server.rand.nextInt(selectStanceList.size());
                 ActionEntry e = selectStanceList.get(num);
-                byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-                if (!CombatHandledOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+                byte nextStance = DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+                if (!DUSKombatOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
                 return true;
             }
             return false;
@@ -2329,8 +2329,8 @@ public class CombatHandledOld {
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (CombatHandledOld.isStanceParrying(_currentStance, nextStance) || CombatHandledOld.isStanceOpposing(_currentStance, nextStance)) continue;
+            byte nextStance = DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (DUSKombatOld.isStanceParrying(_currentStance, nextStance) || DUSKombatOld.isStanceOpposing(_currentStance, nextStance)) continue;
             return true;
         }
         return false;
@@ -2340,8 +2340,8 @@ public class CombatHandledOld {
         for (int x = 0; x < selectStanceList.size(); ++x) {
             int num = Server.rand.nextInt(selectStanceList.size());
             ActionEntry e = selectStanceList.get(num);
-            byte nextStance = CombatHandledOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
-            if (!CombatHandledOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
+            byte nextStance = DUSKombatOld.getStanceForAction(e = Actions.actionEntrys[e.getNumber()]);
+            if (!DUSKombatOld.isNextGoodStance(_currentStance, nextStance, opponentStance)) continue;
             return e;
         }
         return null;
@@ -2354,7 +2354,7 @@ public class CombatHandledOld {
             return idealDist - dist;
         }
         Item wpn = creature.getPrimWeapon();
-        return CombatHandledOld.getDistdiff(wpn, creature, opponent);
+        return DUSKombatOld.getDistdiff(wpn, creature, opponent);
     }
     //Copy pasta
     protected static float getDistdiff(Item weapon, Creature creature, Creature opponent) {
