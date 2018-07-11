@@ -61,15 +61,20 @@ public class CombatMethods {
             bonus += 20;
         }
 
-        double diff = 0;
+        double hitCheck = primWeaponSkill.skillCheck(0, weapon, bonus, noSkillGain, 10.0f);
+
         if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT) > 0){
-            diff -= attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT)*0.05d;
+            hitCheck += attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT)*0.05d;
         }
         if(weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS) > 0){
-            diff -= weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.05d;
+            hitCheck += weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.05d;
         }
 
-        return primWeaponSkill.skillCheck(diff, weapon, bonus, noSkillGain, 10.0f);
+        if(Weapon.getSkillPenaltyForWeapon(weapon) > 0){
+            hitCheck -= Weapon.getSkillPenaltyForWeapon(weapon)*15d;
+        }
+
+        return hitCheck;
     }
     public static double getDodgeCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
         Skill fightingSkill;
@@ -79,9 +84,12 @@ public class CombatMethods {
             fightingSkill = opponent.getSkills().learn(SkillList.GROUP_FIGHTING, 1.0F);
             logger.warning(String.format("%s had no fighting skill. Weird.", opponent.getName()));
         }
-        double bonus = opponent.getBodyControlSkill().skillCheck(attackCheck*0.5d, 0, true, 10.0f);
+        double bonus = opponent.getBodyControlSkill().skillCheck(attackCheck*0.5d, 0, true, 10.0f)*0.5d;
+        // Current bonus: [-50 to 50]
+        bonus += opponent.getMindSpeed().skillCheck(attackCheck*0.5d, 0, true, 10.0f)*0.5d;
         // Current bonus: [-100 to 100]
-        // TODO: Add bonus for lightweight armours etc.
+        bonus += opponent.getMovementScheme().getMoveMod()*100;
+        // Current bonus: [-130 to 130]
 
         if(opponent.getBonusForSpellEffect(Enchants.CRET_WILLOWSPINE) > 0){
             attackCheck *= 1-(opponent.getBonusForSpellEffect(Enchants.CRET_WILLOWSPINE)*0.002d);
@@ -100,15 +108,17 @@ public class CombatMethods {
         if(opponent.getBaseCombatRating() < 50){ // Creatures without high CR get a penalty to their dodge chance based on current stamina.
             double stamDodgeMult = 0.5d * (100d - opponent.getStatus().calcStaminaPercent()); // Up to -50 penalty to the check based on stamina.
             dodgeCheck -= stamDodgeMult;
+        }else{
+            dodgeCheck += opponent.getBaseCombatRating()*0.1; // Addition to the final dodge roll based on previous base CR.
         }
 
         return dodgeCheck;
     }
     public static double getCriticalChance(Creature attacker, Creature opponent, Item weapon){
         double critChance = Weapon.getCritChanceForWeapon(weapon);
-        if (DUSKombat.isAtSoftSpot(opponent.getCombatHandler().getCurrentStance(), attacker.getCombatHandler().getCurrentStance())) {
+        /*if (DUSKombat.isAtSoftSpot(opponent.getCombatHandler().getCurrentStance(), attacker.getCombatHandler().getCurrentStance())) {
             critChance += 0.05f;
-        }
+        }*/
         if (CombatEngine.getEnchantBonus(weapon, opponent) > 0) {
             critChance += 0.03f;
         }
@@ -125,7 +135,7 @@ public class CombatMethods {
         // TODO: Calculate bonus
         double bonus = opponent.getFightingSkill().skillCheck(attackCheck*0.5d, weapon, 0, true, 10f);
 
-        double parryCheck = defWeaponSkill.skillCheck(attackCheck, defWeapon, bonus, true, 10.0f);
+        double parryCheck = defWeaponSkill.skillCheck(attackCheck*1.1d, defWeapon, bonus, true, 10.0f);
 
         if(opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) > 0){
             parryCheck -= opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) * 0.05d;
@@ -135,7 +145,7 @@ public class CombatMethods {
         }
 
         // Apply a penalty to the parry based on the base parry percent.
-        double parryPenalty = 50D*(1D-Weapon.getWeaponParryPercent(defWeapon));
+        double parryPenalty = 30d*(1d-Weapon.getWeaponParryPercent(defWeapon));
         //logger.info(String.format("%s has penalty of %.2f for parry percent %.2f", defWeapon.getName(), parryPenalty, Weapon.getWeaponParryPercent(defWeapon)));
         parryCheck -= parryPenalty;
 
@@ -155,11 +165,11 @@ public class CombatMethods {
         Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
 
         // TODO: Calculate bonus
-        double bonus = opponent.getFightingSkill().skillCheck(attackCheck*0.5d, weapon, 0, true, 10f);
+        double bonus = opponent.getFightingSkill().skillCheck(attackCheck*0.4d, weapon, 0, true, 10f);
 
-        double shieldCheck = defShieldSkill.skillCheck(attackCheck*0.2, defShield, bonus, true, 10.0F);
+        double shieldCheck = defShieldSkill.skillCheck(attackCheck*0.25d, defShield, bonus, true, 10.0F);
 
-        double stamBlockMult = 0.5d * (100d - opponent.getStatus().calcStaminaPercent()); // Up to -50 penalty to the check based on stamina.
+        double stamBlockMult = 0.7d * (100d - opponent.getStatus().calcStaminaPercent()); // Up to -70 penalty to the check based on stamina.
         shieldCheck -= stamBlockMult;
 
         return shieldCheck;

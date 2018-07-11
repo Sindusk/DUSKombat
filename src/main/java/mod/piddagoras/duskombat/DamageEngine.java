@@ -1,6 +1,7 @@
 package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.Server;
+import com.wurmonline.server.WurmId;
 import com.wurmonline.server.bodys.DbWound;
 import com.wurmonline.server.bodys.TempWound;
 import com.wurmonline.server.bodys.Wound;
@@ -42,7 +43,7 @@ public class DamageEngine {
 
     public static boolean addWound(Creature performer, Creature defender, byte type, int pos, double damage, float armourMod, String attString, Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist, Item weapon, boolean critical, boolean glance) {
         // Debug message
-        String perfName = "VOID";
+        /*String perfName = "VOID";
         String defName = "VOID";
         if(performer != null){
             perfName = performer.getName();
@@ -50,11 +51,24 @@ public class DamageEngine {
         if(defender != null){
             defName = defender.getName();
         }
-        //logger.info(String.format("%s dealing wound to %s", perfName, defName));
+        logger.info(String.format("%s dealing wound to %s", perfName, defName));*/
 
         if(defender == null){
             logger.severe("Called addWound with a null defender.");
             return false;
+        }
+
+        // Custom damage multipliers from mod settings.
+        if(performer != null){
+            if((performer.isPlayer() || performer.isDominated()) && !defender.isPlayer() && !defender.isDominated()){
+                damage *= DUSKombatMod.playerToEnvironmentDamageMultiplier;
+            }
+            if(!performer.isPlayer() && !performer.isDominated() && (defender.isPlayer() || defender.isDominated())){
+                damage *= DUSKombatMod.environmentToPlayerDamageMultiplier;
+            }
+            if((performer.isPlayer() || performer.isDominated()) && (defender.isPlayer() || defender.isDominated())){
+                damage *= DUSKombatMod.playerToPlayerDamageMultiplier;
+            }
         }
 
         // Inform creature AI that wounds were inflicted
@@ -148,35 +162,6 @@ public class DamageEngine {
                 // Send combat messages only if the target has been attacked by another creature
                 String woundLoc = defender.getBody().getWoundLocationString(wound.getLocation());
                 CombatMessages.sendDamageMessages(performer, defender, weapon, attString, damage, armourMod, type, woundLoc, critical, glance);
-
-
-                /*ArrayList<MulticolorLineSegment> segments = new ArrayList<MulticolorLineSegment>();
-                segments.add(new CreatureLineSegment(performer));
-                segments.add(new MulticolorLineSegment(" " + otherString + " ", (byte)0));
-                if (performer == defender) {
-                    segments.add(new MulticolorLineSegment(performer.getHimHerItString() + "self", (byte)0));
-                }
-                else {
-                    segments.add(new CreatureLineSegment(defender));
-                }
-                segments.add(new MulticolorLineSegment(" " + getStrengthString(damage / 1000.0) + " in the " + defender.getBody().getWoundLocationString(wound.getLocation()) + " and " + getRealDamageString(damage * armourMod), (byte)0));
-                segments.add(new MulticolorLineSegment("s it.", (byte)0));
-                MessageServer.broadcastColoredAction(segments, performer, defender, 5, true);
-                for (final MulticolorLineSegment s : segments) {
-                    broadCastString += s.getText();
-                }
-                if (performer != defender) {
-                    for (final MulticolorLineSegment s : segments) {
-                        s.setColor((byte)7);
-                    }
-                    defender.getCommunicator().sendColoredMessageCombat(segments);
-                }
-                segments.get(1).setText(" " + attString + " ");
-                segments.get(4).setText(" it.");
-                for (final MulticolorLineSegment s : segments) {
-                    s.setColor((byte)3);
-                }
-                performer.getCommunicator().sendColoredMessageCombat(segments);*/
             }
             if (defender.isDominated()) {
                 if (!archery) {
@@ -216,6 +201,129 @@ public class DamageEngine {
             }
             if (battle != null && performer != null) {
                 battle.addEvent(new BattleEvent((short)114, performer.getName(), defender.getName(), broadCastString));
+            }
+            if (!foundWound) {
+                dead = defender.getBody().addWound(wound);
+            }
+        }
+        return dead;
+    }
+
+    public static boolean addFireWound(Creature performer, Creature defender, int pos, double damage, float armourMod) {
+        if(defender == null){
+            logger.severe("Called addWound with a null defender.");
+            return false;
+        }
+
+        if (performer != null && performer.getTemplate().getCreatureAI() != null) {
+            damage = performer.getTemplate().getCreatureAI().causedWound(performer, defender, Wound.TYPE_BURN, pos, armourMod, damage);
+        }
+        if (defender.getTemplate().getCreatureAI() != null) {
+            damage = defender.getTemplate().getCreatureAI().receivedWound(defender, performer, Wound.TYPE_BURN, pos, armourMod, damage);
+        }
+        if (defender.getCultist() != null && defender.getCultist().hasNoElementalDamage()) {
+            return false;
+        }
+        boolean dead = false;
+        if (DamageMethods.canDealDamage(damage, armourMod)) {
+            if(performer != null) {
+                addDealtDamage(defender.getWurmId(), performer.getWurmId(), damage);
+            }
+            if (defender.hasSpellEffect(Enchants.CRET_STONESKIN)) {
+                defender.reduceStoneSkin();
+                return false;
+            }
+            Wound wound = null;
+            boolean foundWound = false;
+            if (performer != null) {
+                ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
+                segments.add(new MulticolorLineSegment("Your weapon", (byte) 3));
+                segments.add(new MulticolorLineSegment(" burns ", (byte) 3));
+                segments.add(new CreatureLineSegment(defender));
+                segments.add(new MulticolorLineSegment(".", (byte) 3));
+                performer.getCommunicator().sendColoredMessageCombat(segments);
+                segments.set(0, new CreatureLineSegment(performer));
+                for (MulticolorLineSegment s : segments) {
+                    s.setColor((byte) 7);
+                }
+                defender.getCommunicator().sendColoredMessageCombat(segments);
+            }
+            if (defender.getBody().getWounds() != null && (wound = defender.getBody().getWounds().getWoundTypeAtLocation((byte)pos, Wound.TYPE_BURN)) != null) {
+                if (wound.getType() == Wound.TYPE_COLD) {
+                    defender.setWounded();
+                    wound.setBandaged(false);
+                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer());
+                    foundWound = true;
+                } else {
+                    wound = null;
+                }
+            }
+            if (wound == null) {
+                wound = WurmId.getType(defender.getWurmId()) == 1
+                        ? new TempWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f)
+                        : new DbWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null ? performer.isPlayer() : false);
+            }
+            if (!foundWound) {
+                dead = defender.getBody().addWound(wound);
+            }
+        }
+        return dead;
+    }
+
+    public static boolean addColdWound(Creature performer, Creature defender, int pos, double damage, float armourMod) {
+        if(defender == null){
+            logger.severe("Called addWound with a null defender.");
+            return false;
+        }
+
+        if (performer != null && performer.getTemplate().getCreatureAI() != null) {
+            damage = performer.getTemplate().getCreatureAI().causedWound(performer, defender, Wound.TYPE_COLD, pos, armourMod, damage);
+        }
+        if (defender.getTemplate().getCreatureAI() != null) {
+            damage = defender.getTemplate().getCreatureAI().receivedWound(defender, performer, Wound.TYPE_COLD, pos, armourMod, damage);
+        }
+        if (defender.getCultist() != null && defender.getCultist().hasNoElementalDamage()) {
+            return false;
+        }
+        boolean dead = false;
+        if (DamageMethods.canDealDamage(damage, armourMod)) {
+            if(performer != null) {
+                addDealtDamage(defender.getWurmId(), performer.getWurmId(), damage);
+            }
+
+            if (defender.hasSpellEffect(Enchants.CRET_STONESKIN)) {
+                defender.reduceStoneSkin();
+                return false;
+            }
+            Wound wound = null;
+            boolean foundWound = false;
+            if (performer != null) {
+                ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
+                segments.add(new MulticolorLineSegment("Your weapon", (byte) 3));
+                segments.add(new MulticolorLineSegment(" freezes ", (byte) 3));
+                segments.add(new CreatureLineSegment(defender));
+                segments.add(new MulticolorLineSegment(".", (byte) 3));
+                performer.getCommunicator().sendColoredMessageCombat(segments);
+                segments.set(0, new CreatureLineSegment(performer));
+                for (MulticolorLineSegment s : segments) {
+                    s.setColor((byte) 7);
+                }
+                defender.getCommunicator().sendColoredMessageCombat(segments);
+            }
+            if (defender.getBody().getWounds() != null && (wound = defender.getBody().getWounds().getWoundTypeAtLocation((byte)pos, Wound.TYPE_COLD)) != null) {
+                if (wound.getType() == Wound.TYPE_COLD) {
+                    defender.setWounded();
+                    wound.setBandaged(false);
+                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer());
+                    foundWound = true;
+                } else {
+                    wound = null;
+                }
+            }
+            if (wound == null) {
+                wound = WurmId.getType(defender.getWurmId()) == 1
+                        ? new TempWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f)
+                        : new DbWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null && performer.isPlayer());
             }
             if (!foundWound) {
                 dead = defender.getBody().addWound(wound);

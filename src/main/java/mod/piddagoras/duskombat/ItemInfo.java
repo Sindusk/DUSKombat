@@ -39,6 +39,13 @@ public class ItemInfo {
             if(target.isWeapon()) {
                 // Weapon damage, speed, and DPS
                 double baseDamage = DamageMethods.getBaseWeaponDamage(performer, null, target, true);
+                double frostbrandDamage = baseDamage * target.getSpellFrostDamageBonus() * 0.0033d; // 0.33% damage per power
+                double flamingAuraDamage = baseDamage * target.getSpellDamageBonus() * 0.0033d; // 0.33% damage per power
+                byte elementalColor = COLOR_RED;
+                if(frostbrandDamage > flamingAuraDamage){
+                    elementalColor = COLOR_BLUE;
+                }
+                double elementalDamage = frostbrandDamage + flamingAuraDamage;
                 DUSKombat ch = DUSKombat.getCombatHandled(performer);
                 float speed = ch.getSpeed(performer, target);
                 double critChance = Weapon.getCritChanceForWeapon(target);
@@ -46,8 +53,12 @@ public class ItemInfo {
 
                 ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                 segments.add(new MulticolorLineSegment("Attack: ", COLOR_FORESTGREEN));
-                segments.add(new MulticolorLineSegment(String.format("%s damage / %.2f seconds [", (int)baseDamage, speed), COLOR_WHITE));
-                segments.add(new MulticolorLineSegment(String.format("%.1f", baseDamage/speed), COLOR_CYAN));
+                segments.add(new MulticolorLineSegment(String.format("%s", (int)baseDamage), COLOR_WHITE));
+                if(elementalDamage > 0) {
+                    segments.add(new MulticolorLineSegment(String.format(" (+%s)", (int) elementalDamage), elementalColor));
+                }
+                segments.add(new MulticolorLineSegment(String.format(" damage / %.2f seconds [", speed), COLOR_WHITE));
+                segments.add(new MulticolorLineSegment(String.format("%.1f", (baseDamage+elementalDamage)/speed), COLOR_CYAN));
                 segments.add(new MulticolorLineSegment("]", COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
                 segments.clear();
@@ -79,7 +90,7 @@ public class ItemInfo {
                 float averagePhysGlance = totalPhysGlance / physWounds.length;
                 ArrayList<MulticolorLineSegment> segments = new ArrayList<>();
                 segments.add(new MulticolorLineSegment("Physical: ", COLOR_FORESTGREEN));
-                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averagePhysRed)*100f, (1f-averagePhysGlance)*100f), COLOR_WHITE));
+                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averagePhysRed)*100f, averagePhysGlance*100f), COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
 
                 // Elemental reduction
@@ -99,7 +110,7 @@ public class ItemInfo {
                 float averageEleGlance = totalEleGlance / eleWounds.length;
                 segments.clear();
                 segments.add(new MulticolorLineSegment("Elemental: ", COLOR_FORESTGREEN));
-                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averageEleRed)*100f, (1f-averageEleGlance)*100f), COLOR_WHITE));
+                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averageEleRed)*100f, averageEleGlance*100f), COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
 
                 // Other reduction
@@ -120,7 +131,7 @@ public class ItemInfo {
                 float averageOtherGlance = totalOtherGlance / otherWounds.length;
                 segments.clear();
                 segments.add(new MulticolorLineSegment("Other: ", COLOR_FORESTGREEN));
-                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averageOtherRed)*100f, (1f-averageOtherGlance)*100f), COLOR_WHITE));
+                segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averageOtherRed)*100f, averageOtherGlance*100f), COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
             }
         }

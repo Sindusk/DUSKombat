@@ -144,6 +144,7 @@ public class DUSKombat {
         }
     }
     protected static final double PARRY_RECOVERY_SECOND = 0.04d;
+    protected static final double BLOCK_RECOVERY_SECOND = 0.1d;
 
     protected static HashMap<Creature, ArrayList<ParryResistance>> parryResistance = new HashMap<>();
     protected static ParryResistance getParryResistanceFor(Creature creature, int templateId, boolean isShield){
@@ -164,13 +165,27 @@ public class DUSKombat {
         if(item.isWeaponSword()){ // Swords have half parry penalty
             additionalResistance *= 0.5d;
         }
+        if(!item.isBodyPart()) {
+            try {
+                Skill itemSkill = DamageMethods.getCreatureSkill(creature, item.getPrimarySkill());
+                if (itemSkill != null) {
+                    additionalResistance *= (1D - (itemSkill.getKnowledge() / 200D));
+                }
+            } catch (NoSuchSkillException e) {
+                e.printStackTrace();
+            }
+        }
         ParryResistance res = getParryResistanceFor(creature, templateId, item.isShield());
         long timeDelta = System.currentTimeMillis() - res.lastUpdated;
         double secondsPassed = timeDelta / (double) TimeConstants.SECOND_MILLIS;
-        res.currentResistance = Math.min(1d, res.currentResistance+(secondsPassed*PARRY_RECOVERY_SECOND));
+        double recovery = PARRY_RECOVERY_SECOND;
+        if(item.isShield()){
+            recovery = BLOCK_RECOVERY_SECOND;
+        }
+        res.currentResistance = Math.min(1d, res.currentResistance+(secondsPassed*recovery));
         res.currentResistance = Math.max(0d, res.currentResistance-additionalResistance);
         res.lastUpdated = System.currentTimeMillis();
-        double secondsUntilFullyHealed = (1-(res.currentResistance))/PARRY_RECOVERY_SECOND;
+        double secondsUntilFullyHealed = (1-(res.currentResistance))/recovery;
         res.fullyExpires = (long) (System.currentTimeMillis()+(secondsUntilFullyHealed*TimeConstants.SECOND_MILLIS));
         SpellEffectsEnum seff = SpellEffectsEnum.ITEM_DEBUFF_CLUMSINESS;
         if(item.isShield()){
@@ -208,6 +223,8 @@ public class DUSKombat {
             lastPolledParryResistance = System.currentTimeMillis();
         }
     }
+
+    protected long lastSecondaryAttack = 0;
 
     protected float lastTimeStamp=1.0f;
     protected float lastCheckedStance=1.0f;
@@ -356,9 +373,19 @@ public class DUSKombat {
                 if(attacker.isPlayer() && weapon != null && lSecweapon.isBodyPartAttached()){
                     continue; // Ignore weaponless secondary attacks if the player is using a weapon.
                 }
+                if(secweapons.length > 1 && System.currentTimeMillis() < lastSecondaryAttack + TimeConstants.SECOND_MILLIS*2){
+                    // Adding extra cooldown to non-player attacks to avoid burst damage.
+                    continue;
+                }
                 float timeMod = 1.2f + secweapons.length; // Creatures with lots of secondary weapons should be using them slower.
-                if(lSecweapon.getTemplateId() == ItemList.bodyHead){ // Add minor variation so all secondaries don't "spike" damage
-                    timeMod += 0.3f;
+                if(secweapons.length > 1) { // Add minor variation so all secondaries don't "spike" damage
+                    if (lSecweapon.getTemplateId() == ItemList.bodyHead) {
+                        timeMod += 0.31f;
+                    } else if (lSecweapon.getTemplateId() == ItemList.bodyFace) {
+                        timeMod += 0.13f;
+                    } else if (lSecweapon.getTemplateId() == ItemList.bodyLegs) {
+                        timeMod += 0.42f;
+                    }
                 }
                 float time = this.getSpeed(attacker, lSecweapon) * timeMod; // Multiply to make secondary weapons slower.
                 float timer = attacker.addToWeaponUsed(lSecweapon, delta);
@@ -366,6 +393,7 @@ public class DUSKombat {
                 if(isDead || timer <= time) continue;
                 // Actually swing the secondary weapon
                 attacker.deductFromWeaponUsed(lSecweapon, time);
+                lastSecondaryAttack = System.currentTimeMillis();
                 attacker.sendToLoggers("YOU SECONDARY " + lSecweapon.getName(), (byte) 2);
                 opponent.sendToLoggers(attacker.getName() + " SECONDARY " + lSecweapon.getName() + "(" + lSecweapon.getWurmId() + ")", (byte) 2);
                 attacker.setHugeMoveCounter(2 + Server.rand.nextInt(4));//Probably does nothing, but leaving in case.
@@ -396,7 +424,7 @@ public class DUSKombat {
             }
             int[] cmoves = attacker.getCombatMoves();
 
-            if(lastCheckedStance > actionCounter){
+            if(lastCheckedStance > actionCounter){ // Resets lastCheckedStance in a new combat
                 lastCheckedStance = actionCounter;
             }
             if(lastCheckedStance < actionCounter-2) {
@@ -529,6 +557,7 @@ public class DUSKombat {
                 double critRoll = Server.rand.nextDouble();
                 //logger.info(String.format("[%s] %s critRoll: %.2f [%.2f%% chance]", attacker.getName(), attacker.getName(), critRoll*100d, critChance*100d));
                 if(critRoll <= critChance || attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
+                    // Critical strike landed
                     //logger.info(String.format("%s has landed a critical hit on %s! Applying double damage and skipping to damage calculations.", attacker.getName(), opponent.getName()));
                     if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
                         attacker.removeTrueStrike();
@@ -537,6 +566,36 @@ public class DUSKombat {
                     dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, true);
                     return dead;
                 }else{
+                    if(opponent.getShield() != null){
+                        // Test for shield block.
+                        double shieldCheck = CombatMethods.getShieldCheck(attacker, opponent, weapon, attackCheck);
+                        double blockRes = updateParryResistance(opponent, opponent.getShield(), 0);
+                        double blockReduction = (80*(1-blockRes));
+                        shieldCheck -= blockReduction;
+                        if(shieldCheck >= 0){
+                            // Shield block
+                            //logger.info(String.format("%s blocks attack by %s. (Rolled %.2f)", opponent.getName(), attacker.getName(), shieldCheck));
+                            Item defShield = opponent.getShield(); // Cannot be null because check occurs before calling this method.
+                            int defShieldSkillNum = SkillList.GROUP_SHIELDS;
+                            try {
+                                defShieldSkillNum = defShield.getPrimarySkill();
+                            } catch (NoSuchSkillException ex) {
+                                logger.warning(String.format("Could not find proper skill for shield %s. Resorting to Shields group skill.", defShield.getName()));
+                            }
+                            Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
+                            defShieldSkill.skillCheck(attackCheck, defShield, 0, noSkillGain, 10.0F);
+                            updateParryResistance(opponent, defShield, damage*0.0001);
+                            CombatMessages.playShieldBlockEffects(attacker, opponent, weapon, shieldCheck);
+                            float damageMod = !weapon.isBodyPart() && weapon.isWeaponCrush() ? 1.5E-5f : (type == 0 ? 1.0E-6f : 5.0E-6f);
+                            defShield.setDamage(defShield.getDamage() + (damageMod * (float)damage * defShield.getDamageModifier()));
+                            float blockCost = -800f;
+                            if(this.currentStrength == Style.DEFENSIVE.id){
+                                blockCost *= 0.5f;
+                            }
+                            attacker.getStatus().modifyStamina(blockCost);
+                            return dead;
+                        }
+                    }
                     // Begin calculation for parry chance
                     double parryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck);
                     double parryRes = updateParryResistance(opponent, opponent.getPrimWeapon(), 0);
@@ -544,34 +603,8 @@ public class DUSKombat {
                     parryCheck -= parryReduction;
                     //logger.info(String.format("[%s] %s parryCheck: %.2f [-%.2f from parry resistance]", attacker.getName(), opponent.getName(), parryCheck, parryReduction));
                     if(parryCheck < 0){
-                        // Begin calculation for secondary parry or shield block
-                        if(opponent.getShield() != null){
-                            double shieldCheck = CombatMethods.getShieldCheck(attacker, opponent, weapon, attackCheck);
-                            double blockRes = updateParryResistance(opponent, opponent.getShield(), 0);
-                            double blockReduction = (80*(1-blockRes));
-                            shieldCheck -= blockReduction;
-                            //logger.info(String.format("[%s] %s shieldCheck: %.2f [-%.2f from block resistance]", attacker.getName(), opponent.getName(), shieldCheck, blockReduction));
-                            if(shieldCheck < 0){
-                                // All damage avoidance failed.
-                                dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, false);
-                                return dead;
-                            }else{
-                                // Shield block
-                                //logger.info(String.format("%s blocks attack by %s. (Rolled %.2f)", opponent.getName(), attacker.getName(), shieldCheck));
-                                Item defShield = opponent.getShield(); // Cannot be null because check occurs before calling this method.
-                                int defShieldSkillNum = SkillList.GROUP_SHIELDS;
-                                try {
-                                    defShieldSkillNum = defShield.getPrimarySkill();
-                                } catch (NoSuchSkillException ex) {
-                                    logger.warning(String.format("Could not find proper skill for shield %s. Resorting to Shields group skill.", defShield.getName()));
-                                }
-                                Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
-                                defShieldSkill.skillCheck(attackCheck, defShield, 0, noSkillGain, 10.0F);
-                                updateParryResistance(opponent, defShield, damage*0.0001);
-                                CombatMessages.playShieldBlockEffects(attacker, opponent, weapon, shieldCheck);
-                                return dead;
-                            }
-                        }else if(opponent.getSecondaryWeapons().length > 0){
+                        // Begin calculation for secondary parry, if applicable
+                        if(opponent.getSecondaryWeapons().length > 0){
                             // Calculate secondary parries
                             for(Item weap : opponent.getSecondaryWeapons()){
                                 if(!weap.isBodyPartAttached()){
@@ -750,6 +783,7 @@ public class DUSKombat {
             float baseGlanceRate = 0.05f;
             float armourGlanceModifier = ArmourTypes.getArmourGlanceModifier(armour.getArmourType(), armour.getMaterial(), woundType);
             float glanceChance = baseGlanceRate + armourGlanceModifier * (float)Server.getBuffedQualityEffect(armour.getCurrentQualityLevel() / 100.0f);
+            glanceChance *= 1.0f + ItemBonus.getGlanceBonusFor(armour.getArmourType(), woundType, attWeapon, defender);
             float glanceRoll = Server.rand.nextFloat();
             //logger.info(String.format("%s glance chance: %.2f [%.2f roll]", defender.getName(), glanceChance, glanceRoll));
             if(glanceRoll < glanceChance){
@@ -769,6 +803,18 @@ public class DUSKombat {
                 bounceWoundPower = oakshellPower;
                 bounceWoundName = "Thornshell";
             }
+
+            if(!defender.isPlayer()) { // Creature glance rates
+                float baseGlanceRate = 0.05f;
+                float glanceChance = ArmourTypes.getArmourGlanceModifier(defender.getArmourType(), Materials.MATERIAL_IRON, woundType);
+                float glanceRoll = Server.rand.nextFloat();
+                //logger.info(String.format("%s glance chance: %.2f [%.2f roll]", defender.getName(), glanceChance, glanceRoll));
+                if(glanceRoll < glanceChance){
+                    // Attack glances
+                    glance = true;
+                    baseDamage *= 0.4;
+                }
+            }
         }
 
         // Deal damage to the attacker's weapon
@@ -782,8 +828,8 @@ public class DUSKombat {
         }
 
         // Rift item damage reduction bonus
-        double damReductionBonus = ItemBonus.getDamReductionBonusFor(armour != null ? armour.getArmourType() : defender.getArmourType(), woundType, attWeapon, defender);
-        double defdamage = baseDamage * damReductionBonus;
+        //double damReductionBonus = ItemBonus.getDamReductionBonusFor(armour != null ? armour.getArmourType() : defender.getArmourType(), woundType, attWeapon, defender);
+        double defdamage = baseDamage;// * damReductionBonus;
 
         if (defender.isPlayer()) {
             if (((Player)defender).getAlcohol() > 50.0f) {
@@ -928,19 +974,21 @@ public class DUSKombat {
             // Flaming Aura wound
             float flamingAuraPower = attWeapon.getSpellDamageBonus();
             if(flamingAuraPower > 0) {
-                double flamingAuraDamage = defdamage * flamingAuraPower * 0.0035d; // 0.35% damage per power
+                double flamingAuraDamage = defdamage * flamingAuraPower * 0.0033d; // 0.33% damage per power
                 if (!dead && DamageMethods.canDealDamage(flamingAuraDamage, armourMod)) {
                     //dead = DamageEngine.addWound(creature, defender, Wound.TYPE_BURN, position, flamingAuraDamage, armourMod, "ignite", battle, 0, 0, false, false);
-                    dead = defender.addWoundOfType(creature, Wound.TYPE_BURN, position, false, armourMod, false, flamingAuraDamage);
+                    //dead = defender.addWoundOfType(creature, Wound.TYPE_BURN, position, false, armourMod, false, flamingAuraDamage);
+                    dead = DamageEngine.addFireWound(creature, defender, position, flamingAuraDamage, armourMod);
                 }
             }
 
             // Frostbrand wound
             float frostbrandPower = attWeapon.getSpellFrostDamageBonus();
             if(frostbrandPower > 0) {
-                double frostbrandDamage = defdamage * frostbrandPower * 0.0035d; // 0.35% damage per power
+                double frostbrandDamage = defdamage * frostbrandPower * 0.0033d; // 0.33% damage per power
                 if (!dead && DamageMethods.canDealDamage(frostbrandDamage, armourMod)) {
-                    dead = defender.addWoundOfType(creature, Wound.TYPE_COLD, position, false, armourMod, false, frostbrandDamage);
+                    //dead = defender.addWoundOfType(creature, Wound.TYPE_COLD, position, false, armourMod, false, frostbrandDamage);
+                    dead = DamageEngine.addColdWound(creature, defender, position, frostbrandDamage, armourMod);
                 }
             }
 
@@ -982,22 +1030,29 @@ public class DUSKombat {
             // Overkilling stuff?
             if (!Players.getInstance().isOverKilling(creature.getWurmId(), defender.getWurmId()) && attWeapon.getSpellExtraDamageBonus() > 0.0f) {
                 if (defender.isPlayer() && !defender.isNewbie()) {
-                    SpellEffect speff2 = attWeapon.getSpellEffect((byte) 45);
+                    SpellEffect speff2 = attWeapon.getSpellEffect(Enchants.BUFF_BLOODTHIRST);
                     float mod = 1.0f;
                     if (defdamage * (double)armourMod * (double)champMod < 5000.0) {
                         mod = (float)(defdamage * (double)armourMod * (double)champMod / 5000.0);
                     }
                     if (speff2 != null) {
-                        speff2.setPower(Math.min(10000.0f, speff2.power + (dead ? 20.0f : 2.0f * mod)));
+                        float divisor = Math.max(1, speff2.getPower()/1000);
+                        speff2.setPower(Math.min(17000.0f, speff2.power + ((dead ? 20.0f : 2.0f * mod)/divisor)));
                     }
                 } else if (!defender.isPlayer() && !defender.isGuard() && dead) {
-                    SpellEffect speff3 = attWeapon.getSpellEffect((byte) 45);
+                    SpellEffect speff3 = attWeapon.getSpellEffect(Enchants.BUFF_BLOODTHIRST);
                     float mod = 1.0f;
-                    if (speff3.getPower() > 5000.0f && !Servers.isThisAnEpicOrChallengeServer()) {
-                        mod = Math.max(0.5f, 1.0f - (speff3.getPower() - 5000.0f) / 5000.0f);
+                    if(defender.isUnique() || defender.getBaseCombatRating() > 50){
+                        mod = defender.getBaseCombatRating()/50; // Give large bonus for difficult creatures.
+                    }else if(speff3.getPower() >= 15000.0f){
+                        mod = 0f; // No bonus for > 15k unless against difficult creatures.
+                    }else if(speff3.getPower() >= 10000.0f){
+                        mod = Math.max(0.01f, 0.5f - (speff3.getPower() - 10000.0f) / 10000.0f); // Gains between 1% and 50% for 10k - 15k.
+                    }else if (speff3.getPower() > 5000.0f) {
+                        mod = Math.max(0.5f, 1.0f - (speff3.getPower() - 5000.0f) / 5000.0f); // Gains between 50% and 100% for 5k - 10k
                     }
                     if (speff3 != null) {
-                        speff3.setPower(Math.min(10000.0f, speff3.power + defender.getBaseCombatRating() * mod));
+                        speff3.setPower(Math.min(17000.0f, speff3.power + defender.getBaseCombatRating() * mod));
                     }
                 }
             }
@@ -1131,11 +1186,13 @@ public class DUSKombat {
             catch (Exception ex) {
                 logger.log(Level.WARNING, defender.getName() + " and " + performer.getName() + ":" + ex.getMessage(), ex);
             }
-            if (performer.getDeity() != null && performer.getDeity().number == Deities.DEITY_MAGRANON) {
-                performer.maybeModifyAlignment(0.5f);
-            }
-            if (performer.getDeity() != null && performer.getDeity().number == Deities.DEITY_LIBILA) {
-                performer.maybeModifyAlignment(-0.5f);
+            // Apply alignment gains for killing to all gods.
+            if (performer.getDeity() != null) {
+                if(performer.getDeity().isHateGod()) {
+                    performer.maybeModifyAlignment(-0.5f);
+                }else{
+                    performer.maybeModifyAlignment(0.5f);
+                }
             }
         }
         if (performer.getPrimWeapon() != null && (ms = performer.getPrimWeapon().getSpellMindStealModifier()) > 0.0f && !defender.isPlayer() && defender.getKingdomId() != performer.getKingdomId()) {
@@ -1219,11 +1276,14 @@ public class DUSKombat {
         }
         float calcspeed = this.getWeaponSpeed(attacker, weapon);
         calcspeed += timeMod;
-        if (weapon.getSpellSpeedBonus() != 0.0f) {
-            calcspeed = (float)((double)calcspeed - 0.5 * (double)(weapon.getSpellSpeedBonus() / 100.0f));
+        if (weapon.getRarity() > 0) {
+            calcspeed -= weapon.getRarity() * 0.2f; // Rarity bonus
         }
         if (!weapon.isArtifact() && attacker.getBonusForSpellEffect(Enchants.CRET_CHARGE) > 0.0f) {
             calcspeed -= 0.5f; //Frantic Charge
+        }
+        if (weapon.getSpellSpeedBonus() != 0.0f) {
+            calcspeed -= 0.5f * (weapon.getSpellSpeedBonus() / 100.0f); // WoA or BotD
         }
         if (weapon.isTwoHanded() && this.currentStrength == Style.AGGRESSIVE.id) {
             calcspeed *= 0.9f; //Aggressive stance
@@ -1234,7 +1294,7 @@ public class DUSKombat {
         if (attacker.getStatus().getStamina() < 2000) {
             calcspeed += 1.0f; //Low Stamina
         }
-        calcspeed = (float)((double)calcspeed - attacker.getMovementScheme().getWebArmourMod() * 10.0);//Web armour
+        calcspeed = (float)((double)calcspeed - attacker.getMovementScheme().getWebArmourMod() * 10.0); //Web armour
         if (attacker.hasSpellEffect(Enchants.CRET_KARMASLOW)) {
             calcspeed *= 2.0f; //Karma Slow
         }

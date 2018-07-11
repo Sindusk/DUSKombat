@@ -23,6 +23,12 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	public static float minimumSwingTimer = 3.0f;
 	public static boolean useEpicBloodthirst = true;
 	public static boolean showItemCombatInformation = true;
+	public static boolean disablePlayerSkillLoss = false;
+
+	// Damage Multipliers
+    public static float playerToEnvironmentDamageMultiplier = 1.0f;
+    public static float environmentToPlayerDamageMultiplier = 1.0f;
+    public static float playerToPlayerDamageMultiplier = 1.0f;
 
     public static void pollCreatureActionStacks(){
         for(Creature c : Creatures.getInstance().getCreatures()){
@@ -44,9 +50,17 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 	public void configure(Properties properties) {
 		logger.info("Beginning configuration...");
 		Prop.properties = properties;
+
+		// Base Configuration
 		minimumSwingTimer = Prop.getFloatProperty("minimumSwingTimer", minimumSwingTimer);
 		useEpicBloodthirst = Prop.getBooleanProperty("useEpicBloodthirst", useEpicBloodthirst);
 		showItemCombatInformation = Prop.getBooleanProperty("showItemCombatInformation", showItemCombatInformation);
+        disablePlayerSkillLoss = Prop.getBooleanProperty("disablePlayerSkillLoss", disablePlayerSkillLoss);
+
+		// Damage Multipliers
+        playerToEnvironmentDamageMultiplier = Prop.getFloatProperty("playerToEnvironmentDamageMultiplier", playerToEnvironmentDamageMultiplier);
+        environmentToPlayerDamageMultiplier = Prop.getFloatProperty("environmentToPlayerDamageMultiplier", environmentToPlayerDamageMultiplier);
+        playerToPlayerDamageMultiplier = Prop.getFloatProperty("playerToPlayerDamageMultiplier", playerToPlayerDamageMultiplier);
 
     	for (String name : properties.stringPropertyNames()) {
             try {
@@ -79,6 +93,11 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
     	logger.info(String.format("Minimum Swing Timer: %.2f seconds", minimumSwingTimer));
     	logger.info(String.format("Use Epic Bloodthirst: %s", useEpicBloodthirst));
     	logger.info(String.format("Show Item Combat Information: %s", showItemCombatInformation));
+    	logger.info(String.format("Disable Player Skill Loss: %s", disablePlayerSkillLoss));
+    	logger.info("> Damage Multipliers <");
+        logger.info(String.format("Player to Environment: %.2fx", playerToEnvironmentDamageMultiplier));
+        logger.info(String.format("Environment to Player: %.2fx", environmentToPlayerDamageMultiplier));
+        logger.info(String.format("Player to Player: %.2fx", playerToPlayerDamageMultiplier));
         //logger.log(Level.INFO, "enableNonPlayerCrits: " + enableNonPlayerCrits);
         logger.info(" -- Configuration complete -- ");
     }
@@ -173,6 +192,25 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
                             logger.info(String.format("Took some cold damage! %s", data.get("type")));
                         }
                     }));*/
+
+            if(disablePlayerSkillLoss) {
+                Util.setReason("Disable player skill loss.");
+                replace = "if(this.isPlayer()){" +
+                        "  this.getCommunicator().sendSafeServerMessage(\"Your knowledge is kept safe.\");" +
+                        "  return;" +
+                        "}else{" +
+                        "  this.getCommunicator().sendAlertServerMessage(\"You have died without a Resurrection Stone, resulting in some of your knowledge being lost.\");" +
+                        "}";
+                Util.insertBeforeDeclared(thisClass, ctCreature, "punishSkills", replace);
+
+                Util.setReason("Disable player fight skill loss.");
+                replace = "if(this.isPlayer()){" +
+                        "  $_ = null;" +
+                        "}else{" +
+                        "  $_ = $proceed($$);" +
+                        "}";
+                Util.instrumentDeclaredCount(thisClass, ctCreature, "modifyFightSkill", "setKnowledge", 1, replace);
+            }
 
         } catch ( NotFoundException | IllegalArgumentException | ClassCastException e) {
             throw new HookException(e);
