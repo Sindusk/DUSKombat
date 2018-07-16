@@ -57,7 +57,9 @@ public class CombatMethods {
 
         Creature mount = getMountSafe(attacker);
         if(mount != null){
-            // TODO: Change values per mount, and give bonus for tamed mounts.
+            if(mount.getDominator() == attacker){
+                bonus += 10;
+            }
             bonus += 20;
         }
 
@@ -71,7 +73,7 @@ public class CombatMethods {
         }
 
         if(Weapon.getSkillPenaltyForWeapon(weapon) > 0){
-            hitCheck -= Weapon.getSkillPenaltyForWeapon(weapon)*15d;
+            hitCheck -= Weapon.getSkillPenaltyForWeapon(weapon)*10d;
         }
 
         return hitCheck;
@@ -138,10 +140,10 @@ public class CombatMethods {
         double parryCheck = defWeaponSkill.skillCheck(attackCheck*1.1d, defWeapon, bonus, true, 10.0f);
 
         if(opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) > 0){
-            parryCheck -= opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) * 0.05d;
+            parryCheck += opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) * 0.05d;
         }
         if(defWeapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS) > 0){
-            parryCheck -= defWeapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.05d;
+            parryCheck += defWeapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.05d;
         }
 
         // Apply a penalty to the parry based on the base parry percent.
