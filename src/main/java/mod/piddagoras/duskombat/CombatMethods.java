@@ -63,7 +63,12 @@ public class CombatMethods {
             bonus += 20;
         }
 
-        double hitCheck = primWeaponSkill.skillCheck(0, weapon, bonus, noSkillGain, 10.0f);
+        // CR potions
+        if (attacker.getCRCounterBonus() > 0){
+            bonus += attacker.getCRCounterBonus() * 10;
+        }
+
+        double hitCheck = primWeaponSkill.skillCheck(5, weapon, bonus, noSkillGain, 10.0f);
 
         if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT) > 0){
             hitCheck += attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT)*0.05d;
@@ -78,7 +83,7 @@ public class CombatMethods {
 
         return hitCheck;
     }
-    public static double getDodgeCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
+    public static double getDodgeCheck(DUSKombat attackerDK, Creature attacker, Creature opponent, Item weapon, double attackCheck){
         Skill fightingSkill;
         try {
             fightingSkill = opponent.getSkills().getSkill(SkillList.GROUP_FIGHTING);
@@ -100,6 +105,20 @@ public class CombatMethods {
             attackCheck -= opponent.getBonusForSpellEffect(Enchants.CRET_EXCEL) * 0.05d;
         }
 
+        // Style penalty/bonus
+        if(attackerDK.currentStyle == Style.AGGRESSIVE.id){
+            attackCheck += 10d;
+        }else if(attackerDK.currentStyle == Style.DEFENSIVE.id){
+            attackCheck -= 5d;
+        }
+
+        DUSKombat defenderDK = DUSKombat.getCombatHandled(opponent);
+        if(defenderDK.currentStyle == Style.DEFENSIVE.id){
+            attackCheck -= 10d;
+        }else if(defenderDK.currentStyle == Style.AGGRESSIVE.id){
+            attackCheck += 5d;
+        }
+
         double dodgeCheck = fightingSkill.skillCheck(attackCheck, bonus, true, 10.0f);
         if(opponent.isPlayer()){
             dodgeCheck = fightingSkill.skillCheck(attackCheck*1.5, bonus, true, 10.0f); // Reduce crazy dodges from players
@@ -116,17 +135,22 @@ public class CombatMethods {
 
         return dodgeCheck;
     }
-    public static double getCriticalChance(Creature attacker, Creature opponent, Item weapon){
+    public static double getCriticalChance(DUSKombat attackerDK, Creature attacker, Creature opponent, Item weapon){
         double critChance = Weapon.getCritChanceForWeapon(weapon);
         /*if (DUSKombat.isAtSoftSpot(opponent.getCombatHandler().getCurrentStance(), attacker.getCombatHandler().getCurrentStance())) {
             critChance += 0.05f;
         }*/
         if (CombatEngine.getEnchantBonus(weapon, opponent) > 0) {
-            critChance += 0.03f;
+            critChance += 0.03d;
+        }
+
+        // Style bonus
+        if (attackerDK.currentStyle == Style.AGGRESSIVE.id){
+            critChance *= 1.2d;
         }
         return critChance;
     }
-    public static double getParryCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
+    public static double getParryCheck(DUSKombat attackerDK, Creature attacker, Creature opponent, Item weapon, double attackCheck){
         Item defWeapon = opponent.getPrimWeapon();
         if(defWeapon.isBodyPartAttached()){
             return -100; // Unarmed cannot parry.
@@ -134,8 +158,17 @@ public class CombatMethods {
             return -100; // Weapons with no parry chance also cannot parry.
         }
         Skill defWeaponSkill = DUSKombat.getCreatureWeaponSkill(opponent, defWeapon);
-        // TODO: Calculate bonus
+
         double bonus = opponent.getFightingSkill().skillCheck(attackCheck*0.5d, weapon, 0, true, 10f);
+
+        if(attackerDK.currentStyle == Style.AGGRESSIVE.id){
+            bonus -= 5d;
+        }
+
+        DUSKombat defenderDK = DUSKombat.getCombatHandled(opponent);
+        if(defenderDK.currentStyle == Style.DEFENSIVE.id){
+            bonus += 10d;
+        }
 
         double parryCheck = defWeaponSkill.skillCheck(attackCheck*1.1d, defWeapon, bonus, true, 10.0f);
 
@@ -156,7 +189,7 @@ public class CombatMethods {
 
         return parryCheck;
     }
-    public static double getShieldCheck(Creature attacker, Creature opponent, Item weapon, double attackCheck){
+    public static double getShieldCheck(DUSKombat attackerDK, Creature attacker, Creature opponent, Item weapon, double attackCheck){
         Item defShield = opponent.getShield(); // Cannot be null because check occurs before calling this method.
         int defShieldSkillNum = SkillList.GROUP_SHIELDS;
         try {
@@ -166,8 +199,16 @@ public class CombatMethods {
         }
         Skill defShieldSkill = DamageMethods.getCreatureSkill(opponent, defShieldSkillNum);
 
-        // TODO: Calculate bonus
         double bonus = opponent.getFightingSkill().skillCheck(attackCheck*0.4d, weapon, 0, true, 10f);
+
+        if(attackerDK.currentStyle == Style.AGGRESSIVE.id){
+            bonus -= 5d;
+        }
+
+        DUSKombat defenderDK = DUSKombat.getCombatHandled(opponent);
+        if(defenderDK.currentStyle == Style.DEFENSIVE.id){
+            bonus += 10d;
+        }
 
         double shieldCheck = defShieldSkill.skillCheck(attackCheck*0.25d, defShield, bonus, true, 10.0F);
 

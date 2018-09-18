@@ -35,7 +35,7 @@ public class DamageMethods {
             attStrengthSkill = creature.getSkills().getSkill(skillnum);
         } catch (NoSuchSkillException ex) {
             attStrengthSkill = creature.getSkills().learn(skillnum, 1.0F);
-            logger.log(Level.WARNING, creature.getName() + " had no strength. Weird.");
+            logger.log(Level.WARNING, creature.getName() + " had no " + attStrengthSkill.getName() + ". Weird.");
         }
         return attStrengthSkill;
     }
@@ -159,7 +159,7 @@ public class DamageMethods {
                 mult *= 1.0D + (attStrengthSkill.getRealKnowledge() - 20.0D) / 200.0D;
             }
 
-            if (ch.currentStrength == 0) {
+            if (ch.currentStyle == 0) {
                 Skill fstyle = getCreatureSkill(attacker, SkillList.FIGHT_DEFENSIVESTYLE);
 
                 /*try {
@@ -177,9 +177,9 @@ public class DamageMethods {
             }
 
             Skill fstyle;
-            if (attacker.getStatus().getStamina() > 2000 && ch.currentStrength >= 1 && !ch.receivedFStyleSkill) {
+            if (attacker.getStatus().getStamina() > 2000 && ch.currentStyle >= 1 && !ch.receivedFStyleSkill) {
                 int num = SkillList.FIGHT_AGGRESSIVESTYLE;
-                if (ch.currentStrength == 1) {
+                if (ch.currentStyle == 1) {
                     num = SkillList.FIGHT_NORMALSTYLE;
                 }
 
@@ -192,7 +192,7 @@ public class DamageMethods {
 
                 if (fstyle.skillCheck((double)(opponent.getBaseCombatRating() * 3.0F), 0.0D, ch.receivedFStyleSkill || opponent.isNoSkillFor(attacker), 10.0F, attacker, opponent) > 0.0D) {
                     ch.receivedFStyleSkill = true;
-                    if (ch.currentStrength > 1) {
+                    if (ch.currentStyle > 1) {
                         //mult *= 1.0D + Server.getModifiedFloatEffect(fstyle.getRealKnowledge() / 100.0D) / (double)(mildStack ? 8.0F : 4.0F);
                         mult *= 1.0D + Server.getModifiedFloatEffect(fstyle.getRealKnowledge() / 100.0D) / 4.0D;
                     }
@@ -210,7 +210,7 @@ public class DamageMethods {
                 mult = 0.8D * mult + 0.2D * (double)(knowl / 50.0F) * mult;
             }
         } else {
-            mult *= (double)(0.85F + (float)ch.currentStrength * 0.15F);
+            mult *= (double)(0.85F + (float)ch.currentStyle * 0.15F);
         }
 
         // Increase damage by up to 30% if the creature is part of a deed with a strong war bonus (through sacrifice)

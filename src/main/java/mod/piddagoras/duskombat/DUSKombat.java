@@ -6,7 +6,6 @@ import com.wurmonline.server.bodys.BodyTemplate;
 import com.wurmonline.server.bodys.Wound;
 import com.wurmonline.server.combat.*;
 import com.wurmonline.server.creatures.*;
-import com.wurmonline.server.deities.Deities;
 import com.wurmonline.server.items.Item;
 import com.wurmonline.server.items.ItemList;
 import com.wurmonline.server.items.Materials;
@@ -144,7 +143,7 @@ public class DUSKombat {
         }
     }
     protected static final double PARRY_RECOVERY_SECOND = 0.04d;
-    protected static final double BLOCK_RECOVERY_SECOND = 0.1d;
+    protected static final double BLOCK_RECOVERY_SECOND = 0.2d;
 
     protected static HashMap<Creature, ArrayList<ParryResistance>> parryResistance = new HashMap<>();
     protected static ParryResistance getParryResistanceFor(Creature creature, int templateId, boolean isShield){
@@ -229,7 +228,7 @@ public class DUSKombat {
     protected float lastTimeStamp=1.0f;
     protected float lastCheckedStance=1.0f;
     protected byte currentStance=15; //Need to look into what stances are.
-    protected byte currentStrength=1;//Depends on aggressive/normal/defensive style active currently.
+    protected byte currentStyle =1;//Depends on aggressive/normal/defensive style active currently.
     protected byte opportunityAttacks=0;//Need to look closely at how opportunities work.
 	//protected HashSet<Item> secattacks;//Probably updates in other methods besides attackLoop.
     //protected boolean turned = false; // No longer used, turning attacker instead of opponents.
@@ -494,11 +493,11 @@ public class DUSKombat {
             return false;
         }
 
-        // Update currentStrength to latest value
+        // Update currentStyle to latest value
         try {
-            this.currentStrength = ReflectionUtil.getPrivateField(attacker.getCombatHandler(), ReflectionUtil.getField(attacker.getCombatHandler().getClass(), "currentStrength"));
+            this.currentStyle = ReflectionUtil.getPrivateField(attacker.getCombatHandler(), ReflectionUtil.getField(attacker.getCombatHandler().getClass(), "currentStrength"));
         } catch (IllegalAccessException | NoSuchFieldException e) {
-            logger.info(String.format("Failed to get currentStrength for %s from combat handler.", attacker.getName()));
+            logger.info(String.format("Failed to get currentStyle for %s from combat handler.", attacker.getName()));
             e.printStackTrace();
         }
 
@@ -535,12 +534,12 @@ public class DUSKombat {
         //logger.info("No skill gain = "+noSkillGain);
 
         // Reduce stamina from the attacker on swing
-        //attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStrength * 0.5F))));
-        float staminaCost = -300F - weapon.getWeightGrams() / 20F;
-        if(this.currentStrength == Style.AGGRESSIVE.id){
-            staminaCost *= 1.2f;
-        }else if(this.currentStrength == Style.DEFENSIVE.id){
-            staminaCost *= 0.8f;
+        //attacker.getStatus().modifyStamina((float)((int)((float)(-weapon.getWeightGrams()) / 10.0F * (1.0F + (float)this.currentStyle * 0.5F))));
+        float staminaCost = -600F - weapon.getWeightGrams() / 10F;
+        if(this.currentStyle == Style.AGGRESSIVE.id){
+            staminaCost *= 1.3f;
+        }else if(this.currentStyle == Style.DEFENSIVE.id){
+            staminaCost *= 0.7f;
         }
         attacker.getStatus().modifyStamina(staminaCost);
 
@@ -549,11 +548,11 @@ public class DUSKombat {
         //logger.info(String.format("[%s] %s's attackCheck: %.2f", attacker.getName(), attacker.getName(), attackCheck));
         if(attackCheck >= 0) {
             // Begin calculation for dodge.
-            double dodgeCheck = CombatMethods.getDodgeCheck(attacker, opponent, weapon, attackCheck);
+            double dodgeCheck = CombatMethods.getDodgeCheck(this, attacker, opponent, weapon, attackCheck);
             //logger.info(String.format("[%s] %s dodgeCheck: %.2f", attacker.getName(), opponent.getName(), dodgeCheck));
             if(dodgeCheck < 0){
                 // Begin calculation for critical strike
-                double critChance = CombatMethods.getCriticalChance(attacker, opponent, weapon);
+                double critChance = CombatMethods.getCriticalChance(this, attacker, opponent, weapon);
                 double critRoll = Server.rand.nextDouble();
                 //logger.info(String.format("[%s] %s critRoll: %.2f [%.2f%% chance]", attacker.getName(), attacker.getName(), critRoll*100d, critChance*100d));
                 if(critRoll <= critChance || attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
@@ -562,13 +561,17 @@ public class DUSKombat {
                     if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUESTRIKE) > 0){
                         attacker.removeTrueStrike();
                     }
-                    damage *= 1.5D;
+                    if (this.currentStyle == Style.DEFENSIVE.id){
+                        damage *= 1.4D;
+                    }else {
+                        damage *= 1.5D;
+                    }
                     dead = this.dealDamage(attacker, opponent, weapon, damage, armourMod, pos, type, noSkillGain, true);
                     return dead;
                 }else{
                     if(opponent.getShield() != null){
                         // Test for shield block.
-                        double shieldCheck = CombatMethods.getShieldCheck(attacker, opponent, weapon, attackCheck);
+                        double shieldCheck = CombatMethods.getShieldCheck(this, attacker, opponent, weapon, attackCheck);
                         double blockRes = updateParryResistance(opponent, opponent.getShield(), 0);
                         double blockReduction = (80*(1-blockRes));
                         shieldCheck -= blockReduction;
@@ -589,7 +592,7 @@ public class DUSKombat {
                             float damageMod = !weapon.isBodyPart() && weapon.isWeaponCrush() ? 1.5E-5f : (type == 0 ? 1.0E-6f : 5.0E-6f);
                             defShield.setDamage(defShield.getDamage() + (damageMod * (float)damage * defShield.getDamageModifier()));
                             float blockCost = -800f;
-                            if(this.currentStrength == Style.DEFENSIVE.id){
+                            if(this.currentStyle == Style.DEFENSIVE.id){
                                 blockCost *= 0.5f;
                             }
                             attacker.getStatus().modifyStamina(blockCost);
@@ -597,7 +600,7 @@ public class DUSKombat {
                         }
                     }
                     // Begin calculation for parry chance
-                    double parryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck);
+                    double parryCheck = CombatMethods.getParryCheck(this, attacker, opponent, weapon, attackCheck);
                     double parryRes = updateParryResistance(opponent, opponent.getPrimWeapon(), 0);
                     double parryReduction = (50*(1-parryRes));
                     parryCheck -= parryReduction;
@@ -608,7 +611,7 @@ public class DUSKombat {
                             // Calculate secondary parries
                             for(Item weap : opponent.getSecondaryWeapons()){
                                 if(!weap.isBodyPartAttached()){
-                                    double secondaryParryCheck = CombatMethods.getParryCheck(attacker, opponent, weapon, attackCheck*2);
+                                    double secondaryParryCheck = CombatMethods.getParryCheck(this, attacker, opponent, weapon, attackCheck*2);
                                     double secondaryParryRes = updateParryResistance(opponent, weap, 0);
                                     double secondaryParryReduction = (100*(1-secondaryParryRes));
                                     secondaryParryCheck -= secondaryParryReduction;
@@ -717,7 +720,7 @@ public class DUSKombat {
         float armourMod = defender.getArmourMod(); // Template armour
         Item armour = null;
         try {
-            armour = defender.getArmour((byte) Armour.getArmourPosForPos(position));
+            armour = defender.getArmour(ArmourTemplate.getArmourPosition(position));
         } catch (NoArmourException ignored) {
         } catch (NoSpaceException e) {
             logger.log(Level.WARNING, defender.getName() + " no armour space on loc " + position);
@@ -725,9 +728,9 @@ public class DUSKombat {
         }
         if(armour != null){
             if(armourMod < 1.0f) { // Use the best DR between natural armour and worn armour if the creature has natural armour.
-                armourMod = Math.min(armourMod, Armour.getArmourModFor(armour, woundType));
+                armourMod = Math.min(armourMod, ArmourTemplate.calculateDR(armour, woundType));
             }else{ // Multiply armour value by natural armour if they are supposed to take extra damage.
-                armourMod *= Armour.getArmourModFor(armour, woundType);
+                armourMod *= ArmourTemplate.calculateDR(armour, woundType);
             }
         }else{
             float omod = 100.0f;
@@ -751,7 +754,7 @@ public class DUSKombat {
         Item armour = null;
         boolean metalArmour = false;
         try {
-            armour = defender.getArmour((byte) Armour.getArmourPosForPos(position));
+            armour = defender.getArmour((byte) ArmourTemplate.getArmourPosition(position));
         } catch (NoArmourException ignored) {
         } catch (NoSpaceException e) {
             logger.log(Level.WARNING, defender.getName() + " no armour space on loc " + position);
@@ -764,7 +767,7 @@ public class DUSKombat {
         if(armour != null){
             // Calculate damage dealt to the armour
             float baseArmourDamage = (float) (baseDamage * Weapon.getMaterialArmourDamageBonus(attWeapon.getMaterial()));
-            float woundTypeMultiplier = Armour.getArmourDamageModFor(armour, woundType);
+            float woundTypeMultiplier = ArmourTemplate.getArmourDamageModFor(armour, woundType);
             armour.setDamage(armour.getDamage() + Math.max(0.01f, Math.min(1.0f, baseArmourDamage * woundTypeMultiplier / 600000.0f) * armour.getDamageModifier()));
             CombatEngine.checkEnchantDestruction(attWeapon, armour, defender);
 
@@ -781,7 +784,7 @@ public class DUSKombat {
 
             // Glancing strike
             float baseGlanceRate = 0.05f;
-            float armourGlanceModifier = ArmourTypes.getArmourGlanceModifier(armour.getArmourType(), armour.getMaterial(), woundType);
+            float armourGlanceModifier = armour.getArmourType().getGlanceRate(woundType, armour.getMaterial());
             float glanceChance = baseGlanceRate + armourGlanceModifier * (float)Server.getBuffedQualityEffect(armour.getCurrentQualityLevel() / 100.0f);
             glanceChance *= 1.0f + ItemBonus.getGlanceBonusFor(armour.getArmourType(), woundType, attWeapon, defender);
             float glanceRoll = Server.rand.nextFloat();
@@ -806,7 +809,7 @@ public class DUSKombat {
 
             if(!defender.isPlayer()) { // Creature glance rates
                 float baseGlanceRate = 0.05f;
-                float glanceChance = ArmourTypes.getArmourGlanceModifier(defender.getArmourType(), Materials.MATERIAL_IRON, woundType);
+                float glanceChance = defender.getArmourType().getGlanceRate(woundType, Materials.MATERIAL_IRON);
                 float glanceRoll = Server.rand.nextFloat();
                 //logger.info(String.format("%s glance chance: %.2f [%.2f roll]", defender.getName(), glanceChance, glanceRoll));
                 if(glanceRoll < glanceChance){
@@ -850,9 +853,9 @@ public class DUSKombat {
 
             // Apply skill gain
             Skill fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_NORMALSTYLE);
-            if(this.currentStrength == Style.AGGRESSIVE.id){
+            if(this.currentStyle == Style.AGGRESSIVE.id){
                 fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_AGGRESSIVESTYLE);
-            }else if(this.currentStrength == Style.DEFENSIVE.id){
+            }else if(this.currentStyle == Style.DEFENSIVE.id){
                 fstyle = DamageMethods.getCreatureSkill(creature, SkillList.FIGHT_DEFENSIVESTYLE);
             }
             fstyle.skillCheck(0, 0, blockSkill, 10f);
@@ -912,7 +915,7 @@ public class DUSKombat {
 
             // One shot death if it's a rooster etc.
             if (defender.getStaminaSkill().getKnowledge() < 2.0) {
-                defender.die(false);
+                defender.die(false, "Critter death by attack");
                 creature.achievement(223);
                 dead = true;
                 return dead;
@@ -1162,7 +1165,7 @@ public class DUSKombat {
                 } else {
                     performer.maybeModifyAlignment(5.0f);
                 }
-                if (getCombatHandled(performer).currentStrength == Style.DEFENSIVE.id) {
+                if (getCombatHandled(performer).currentStyle == Style.DEFENSIVE.id) {
                     performer.achievement(43);
                 }
             }
@@ -1271,7 +1274,7 @@ public class DUSKombat {
     //Copy pasta
     protected float getSpeed(Creature attacker, Item weapon) {
         float timeMod = 0.5f;
-        if (this.currentStrength == Style.DEFENSIVE.id) {
+        if (this.currentStyle == Style.DEFENSIVE.id) {
             timeMod = 1.5f;
         }
         float calcspeed = this.getWeaponSpeed(attacker, weapon);
@@ -1285,7 +1288,7 @@ public class DUSKombat {
         if (weapon.getSpellSpeedBonus() != 0.0f) {
             calcspeed -= 0.5f * (weapon.getSpellSpeedBonus() / 100.0f); // WoA or BotD
         }
-        if (weapon.isTwoHanded() && this.currentStrength == Style.AGGRESSIVE.id) {
+        if (weapon.isTwoHanded() && this.currentStyle == Style.AGGRESSIVE.id) {
             calcspeed *= 0.9f; //Aggressive stance
         }
         if (!Features.Feature.METALLIC_ITEMS.isEnabled() && weapon.getMaterial() == Materials.MATERIAL_GLIMMERSTEEL) {
@@ -2171,7 +2174,7 @@ public class DUSKombat {
             combatRating -= 5.0F;
         }
 
-        if (attacker.hasSpellEffect((byte)97)) {
+        if (attacker.hasSpellEffect(Enchants.ITEM_DEBUFF_CLUMSINESS)) {
             combatRating -= 4.0F;
         }
 
@@ -2218,9 +2221,9 @@ public class DUSKombat {
         combatRating += ItemBonus.getCRBonus(attacker);
         float crmod = 1.0F;
         if (attacking) {
-            if (attacker.isPlayer() && this.currentStrength >= 1 && attacker.getStatus().getStamina() > 2000) {
+            if (attacker.isPlayer() && this.currentStyle >= 1 && attacker.getStatus().getStamina() > 2000) {
                 int num = SkillList.FIGHT_AGGRESSIVESTYLE;
-                if (this.currentStrength == Style.NORMAL.id) {
+                if (this.currentStyle == Style.NORMAL.id) {
                     num = SkillList.FIGHT_NORMALSTYLE;
                 }
 
@@ -2233,10 +2236,10 @@ public class DUSKombat {
                 }
 
                 if (def.skillCheck((double)(attacker.getBaseCombatRating() * 2.0F), 0.0D, true, 10.0F, attacker, opponent) > 0.0D) {
-                    combatRating = (float)((double)combatRating + (double)((float)this.currentStrength / 2.0F) * Server.getModifiedFloatEffect(def.getRealKnowledge() / 100.0D));
+                    combatRating = (float)((double)combatRating + (double)((float)this.currentStyle / 2.0F) * Server.getModifiedFloatEffect(def.getRealKnowledge() / 100.0D));
                 }
             }
-        } else if (attacker.isPlayer() && this.currentStrength > 1) {
+        } else if (attacker.isPlayer() && this.currentStyle > 1) {
             Skill def;
 
             try {
@@ -2246,7 +2249,7 @@ public class DUSKombat {
             }
 
             if (def.skillCheck(Server.getModifiedFloatEffect(70.0D), 0.0D, true, 10.0F, attacker, opponent) < 0.0D) {
-                combatRating = (float)((double)combatRating - (double)this.currentStrength * Server.getModifiedFloatEffect((100.0D - def.getRealKnowledge()) / 100.0D));
+                combatRating = (float)((double)combatRating - (double)this.currentStyle * Server.getModifiedFloatEffect((100.0D - def.getRealKnowledge()) / 100.0D));
             }
         }
 

@@ -2,8 +2,7 @@ package mod.piddagoras.duskombat;
 
 import com.wurmonline.server.Server;
 import com.wurmonline.server.bodys.Wound;
-import com.wurmonline.server.combat.Armour;
-import com.wurmonline.server.combat.ArmourTypes;
+import com.wurmonline.server.combat.ArmourTemplate;
 import com.wurmonline.server.combat.Weapon;
 import com.wurmonline.server.creatures.Communicator;
 import com.wurmonline.server.items.Item;
@@ -82,8 +81,8 @@ public class ItemInfo {
                 float totalPhysRed = 0;
                 float totalPhysGlance = 0;
                 for(byte woundType : physWounds){
-                    totalPhysRed += Armour.getArmourModFor(target, woundType);
-                    float glanceRate = ArmourTypes.getArmourGlanceModifier(target.getArmourType(), target.getMaterial(), woundType) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
+                    totalPhysRed += ArmourTemplate.calculateDR(target, woundType);
+                    float glanceRate = target.getArmourType().getGlanceRate(woundType, target.getMaterial()) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
                     totalPhysGlance += 0.05f + glanceRate;
                 }
                 float averagePhysRed = totalPhysRed / physWounds.length;
@@ -102,8 +101,8 @@ public class ItemInfo {
                 float totalEleRed = 0;
                 float totalEleGlance = 0;
                 for(byte woundType : eleWounds){
-                    totalEleRed += Armour.getArmourModFor(target, woundType);
-                    float glanceRate = ArmourTypes.getArmourGlanceModifier(target.getArmourType(), target.getMaterial(), woundType) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
+                    totalEleRed += ArmourTemplate.calculateDR(target, woundType);
+                    float glanceRate = target.getArmourType().getGlanceRate(woundType, target.getMaterial()) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
                     totalEleGlance += 0.05f + glanceRate;
                 }
                 float averageEleRed = totalEleRed / eleWounds.length;
@@ -123,8 +122,8 @@ public class ItemInfo {
                 float totalOtherRed = 0;
                 float totalOtherGlance = 0;
                 for(byte woundType : otherWounds){
-                    totalOtherRed += Armour.getArmourModFor(target, woundType);
-                    float glanceRate = ArmourTypes.getArmourGlanceModifier(target.getArmourType(), target.getMaterial(), woundType) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
+                    totalOtherRed += ArmourTemplate.calculateDR(target, woundType);
+                    float glanceRate = target.getArmourType().getGlanceRate(woundType, target.getMaterial()) * (float)Server.getBuffedQualityEffect(target.getCurrentQualityLevel() / 100.0f);
                     totalOtherGlance += 0.05f + glanceRate;
                 }
                 float averageOtherRed = totalOtherRed / otherWounds.length;
