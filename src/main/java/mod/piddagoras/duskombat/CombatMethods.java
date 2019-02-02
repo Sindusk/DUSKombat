@@ -130,7 +130,7 @@ public class CombatMethods {
             double stamDodgeMult = 0.5d * (100d - opponent.getStatus().calcStaminaPercent()); // Up to -50 penalty to the check based on stamina.
             dodgeCheck -= stamDodgeMult;
         }else{
-            dodgeCheck += opponent.getBaseCombatRating()*0.1; // Addition to the final dodge roll based on previous base CR.
+            dodgeCheck += (opponent.getBaseCombatRating() / opponent.getStatus().getBattleRatingTypeModifier()) * 0.1; // Addition to the final dodge roll based on previous base CR.
         }
 
         return dodgeCheck;
