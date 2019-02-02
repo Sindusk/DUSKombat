@@ -772,7 +772,7 @@ public class DUSKombat {
             CombatEngine.checkEnchantDestruction(attWeapon, armour, defender);
 
             // Aura of Shared Pain
-            float aospPower = armour.getSpellPainShare();
+            float aospPower = Math.min(DUSKombatMod.getCombatEnchantCap(), armour.getSpellPainShare());
             if (aospPower > 0.0f) {
                 bounceWoundPower = aospPower;
                 bounceWoundName = "Aura of Shared Pain";
@@ -934,7 +934,7 @@ public class DUSKombat {
             if(creature.getBody() != null && creature.getBody().getWounds() != null && creature.getBody().getWounds().getWounds() != null) { // Ensure wounds are initialized
                 Wound[] w = creature.getBody().getWounds().getWounds();
                 if(w.length > 0) { // Ensure the player has at least one wound.
-                    float lifeTransferPower = attWeapon.getSpellLifeTransferModifier();
+                    float lifeTransferPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellLifeTransferModifier());
                     if(lifeTransferPower > 0) {
                         float lifeTransferChampMod = creature.isChampion() ? 500.0f : 250.0f;
                         if(creature.getCultist() != null && creature.getCultist().healsFaster()){
@@ -975,7 +975,7 @@ public class DUSKombat {
             }
 
             // Flaming Aura wound
-            float flamingAuraPower = attWeapon.getSpellDamageBonus();
+            float flamingAuraPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellDamageBonus());
             if(flamingAuraPower > 0) {
                 double flamingAuraDamage = defdamage * flamingAuraPower * 0.0033d; // 0.33% damage per power
                 if (!dead && DamageMethods.canDealDamage(flamingAuraDamage, armourMod)) {
@@ -986,7 +986,7 @@ public class DUSKombat {
             }
 
             // Frostbrand wound
-            float frostbrandPower = attWeapon.getSpellFrostDamageBonus();
+            float frostbrandPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellFrostDamageBonus());
             if(frostbrandPower > 0) {
                 double frostbrandDamage = defdamage * frostbrandPower * 0.0033d; // 0.33% damage per power
                 if (!dead && DamageMethods.canDealDamage(frostbrandDamage, armourMod)) {
@@ -1022,7 +1022,7 @@ public class DUSKombat {
 
             // Web Armour
             if (armour != null && armour.getSpellSlowdown() > 0.0f) {
-                float webArmourPower = armour.getSpellSlowdown();
+                float webArmourPower = Math.min(DUSKombatMod.getCombatEnchantCap(), armour.getSpellSlowdown());
                 if (creature.getMovementScheme().setWebArmourMod(true, webArmourPower)) {
                     creature.setWebArmourModTime(webArmourPower / 10.0f);
                     CombatMessages.sendWebArmourMessages(creature, defender, armour);
@@ -1286,7 +1286,8 @@ public class DUSKombat {
             calcspeed -= 0.5f; //Frantic Charge
         }
         if (weapon.getSpellSpeedBonus() != 0.0f) {
-            calcspeed -= 0.5f * (weapon.getSpellSpeedBonus() / 100.0f); // WoA or BotD
+            float speedBonus = Math.min(DUSKombatMod.getCombatEnchantCap(), weapon.getSpellSpeedBonus());
+            calcspeed -= 0.5f * (speedBonus / 100.0f); // WoA or BotD
         }
         if (weapon.isTwoHanded() && this.currentStyle == Style.AGGRESSIVE.id) {
             calcspeed *= 0.9f; //Aggressive stance
@@ -2188,7 +2189,7 @@ public class DUSKombat {
             }
         }
 
-        float bon = weapon.getSpellNimbleness();
+        float bon = Math.min(DUSKombatMod.getCombatEnchantCap(), weapon.getSpellNimbleness());
         if (bon > 0.0F) {
             combatRating += bon / 30.0F;
         }

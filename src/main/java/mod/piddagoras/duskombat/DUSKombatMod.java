@@ -30,6 +30,13 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
     public static float environmentToPlayerDamageMultiplier = 1.0f;
     public static float playerToPlayerDamageMultiplier = 1.0f;
 
+    // Miscellaneous options
+    public static float combatEnchantCap = 0; // A setting of 0 disables this.
+
+    public static float getCombatEnchantCap(){
+        return combatEnchantCap;
+    }
+
     public static void pollCreatureActionStacks(){
         for(Creature c : Creatures.getInstance().getCreatures()){
             if(c.isFighting()) {
@@ -61,6 +68,13 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
         playerToEnvironmentDamageMultiplier = Prop.getFloatProperty("playerToEnvironmentDamageMultiplier", playerToEnvironmentDamageMultiplier);
         environmentToPlayerDamageMultiplier = Prop.getFloatProperty("environmentToPlayerDamageMultiplier", environmentToPlayerDamageMultiplier);
         playerToPlayerDamageMultiplier = Prop.getFloatProperty("playerToPlayerDamageMultiplier", playerToPlayerDamageMultiplier);
+
+        combatEnchantCap = Prop.getFloatProperty("combatEnchantCap", combatEnchantCap);
+        String combatEnchantCapString = String.format("%.2f", combatEnchantCap);
+        if (combatEnchantCap <= 0){
+            combatEnchantCap = Float.MAX_VALUE; // If the setting is 0 or lower, we don't need an enchant cap.
+            combatEnchantCapString = "Uncapped";
+        }
 
     	for (String name : properties.stringPropertyNames()) {
             try {
@@ -98,6 +112,8 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
         logger.info(String.format("Player to Environment: %.2fx", playerToEnvironmentDamageMultiplier));
         logger.info(String.format("Environment to Player: %.2fx", environmentToPlayerDamageMultiplier));
         logger.info(String.format("Player to Player: %.2fx", playerToPlayerDamageMultiplier));
+        logger.info("> Miscellaneous Features <");
+        logger.info(String.format("Combat Damage Enchant Cap: %s", combatEnchantCapString));
         //logger.log(Level.INFO, "enableNonPlayerCrits: " + enableNonPlayerCrits);
         logger.info(" -- Configuration complete -- ");
     }
