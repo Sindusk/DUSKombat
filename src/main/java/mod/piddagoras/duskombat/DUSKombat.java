@@ -591,11 +591,13 @@ public class DUSKombat {
                             CombatMessages.playShieldBlockEffects(attacker, opponent, weapon, shieldCheck);
                             float damageMod = !weapon.isBodyPart() && weapon.isWeaponCrush() ? 1.5E-5f : (type == 0 ? 1.0E-6f : 5.0E-6f);
                             defShield.setDamage(defShield.getDamage() + (damageMod * (float)damage * defShield.getDamageModifier()));
-                            float blockCost = -800f;
+                            float blockCost = -1500f;
                             if(this.currentStyle == Style.DEFENSIVE.id){
                                 blockCost *= 0.5f;
+                            }else if(this.currentStyle == Style.AGGRESSIVE.id){
+                                blockCost *= 1.3f;
                             }
-                            attacker.getStatus().modifyStamina(blockCost);
+                            opponent.getStatus().modifyStamina(blockCost);
                             return dead;
                         }
                     }
@@ -724,7 +726,6 @@ public class DUSKombat {
         } catch (NoArmourException ignored) {
         } catch (NoSpaceException e) {
             logger.log(Level.WARNING, defender.getName() + " no armour space on loc " + position);
-            e.printStackTrace();
         }
         if(armour != null){
             if(armourMod < 1.0f) { // Use the best DR between natural armour and worn armour if the creature has natural armour.
@@ -754,7 +755,7 @@ public class DUSKombat {
         Item armour = null;
         boolean metalArmour = false;
         try {
-            armour = defender.getArmour((byte) ArmourTemplate.getArmourPosition(position));
+            armour = defender.getArmour(ArmourTemplate.getArmourPosition(position));
         } catch (NoArmourException ignored) {
         } catch (NoSpaceException e) {
             logger.log(Level.WARNING, defender.getName() + " no armour space on loc " + position);
@@ -977,7 +978,7 @@ public class DUSKombat {
             // Flaming Aura wound
             float flamingAuraPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellDamageBonus());
             if(flamingAuraPower > 0) {
-                double flamingAuraDamage = defdamage * flamingAuraPower * 0.0033d; // 0.33% damage per power
+                double flamingAuraDamage = defdamage * flamingAuraPower * 0.003d; // 0.30% damage per power
                 if (!dead && DamageMethods.canDealDamage(flamingAuraDamage, armourMod)) {
                     //dead = DamageEngine.addWound(creature, defender, Wound.TYPE_BURN, position, flamingAuraDamage, armourMod, "ignite", battle, 0, 0, false, false);
                     //dead = defender.addWoundOfType(creature, Wound.TYPE_BURN, position, false, armourMod, false, flamingAuraDamage);
@@ -988,7 +989,7 @@ public class DUSKombat {
             // Frostbrand wound
             float frostbrandPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellFrostDamageBonus());
             if(frostbrandPower > 0) {
-                double frostbrandDamage = defdamage * frostbrandPower * 0.0033d; // 0.33% damage per power
+                double frostbrandDamage = defdamage * frostbrandPower * 0.003d; // 0.30% damage per power
                 if (!dead && DamageMethods.canDealDamage(frostbrandDamage, armourMod)) {
                     //dead = defender.addWoundOfType(creature, Wound.TYPE_COLD, position, false, armourMod, false, frostbrandDamage);
                     dead = DamageEngine.addColdWound(creature, defender, position, frostbrandDamage, armourMod);
@@ -1275,30 +1276,50 @@ public class DUSKombat {
     protected float getSpeed(Creature attacker, Item weapon) {
         float timeMod = 0.5f;
         if (this.currentStyle == Style.DEFENSIVE.id) {
-            timeMod = 1.5f;
+            timeMod = 1.0f;
         }
+
         float calcspeed = this.getWeaponSpeed(attacker, weapon);
         calcspeed += timeMod;
         if (weapon.getRarity() > 0) {
             calcspeed -= weapon.getRarity() * 0.2f; // Rarity bonus
         }
+
+        // Frantic Charge
         if (!weapon.isArtifact() && attacker.getBonusForSpellEffect(Enchants.CRET_CHARGE) > 0.0f) {
-            calcspeed -= 0.5f; //Frantic Charge
+            float maxBonus = calcspeed * 0.1f; // 10% of the swing speed
+            float percentage = attacker.getBonusForSpellEffect(Enchants.CRET_CHARGE) / 100f; // Percentage to reduce by
+            calcspeed -= maxBonus * percentage;
         }
-        if (weapon.getSpellSpeedBonus() != 0.0f) {
+
+        // Wind of Ages or Blessings of the Dark
+        if (weapon.getSpellSpeedBonus() > 0.0f) {
+            float maxBonus = calcspeed * 0.1f; // 10% of the swing speed
             float speedBonus = Math.min(DUSKombatMod.getCombatEnchantCap(), weapon.getSpellSpeedBonus());
-            calcspeed -= 0.5f * (speedBonus / 100.0f); // WoA or BotD
+            float percentage = speedBonus / 100.0f;
+            calcspeed -= maxBonus * percentage;
         }
+
         if (weapon.isTwoHanded() && this.currentStyle == Style.AGGRESSIVE.id) {
             calcspeed *= 0.9f; //Aggressive stance
         }
+
         if (!Features.Feature.METALLIC_ITEMS.isEnabled() && weapon.getMaterial() == Materials.MATERIAL_GLIMMERSTEEL) {
             calcspeed *= 0.9f; //Glimmersteel
         }
+
         if (attacker.getStatus().getStamina() < 2000) {
             calcspeed += 1.0f; //Low Stamina
         }
-        calcspeed = (float)((double)calcspeed - attacker.getMovementScheme().getWebArmourMod() * 10.0); //Web armour
+
+        //calcspeed = (float)((double)calcspeed - attacker.getMovementScheme().getWebArmourMod() * 10.0); //Web armour
+
+        // Web Armour mod is -0.5 at 100 power, -1.0 at 200 power, etc.
+        // To cause it to double the swing timer per 200 power,
+        // we simply need to reverse it's value and multiply that to the calcspeed.
+        float waMult = (float) (attacker.getMovementScheme().getWebArmourMod() * -1d); // Value is 0.5 at 100 power, 1.0 at 200 power, etc.
+        calcspeed *= 1f + waMult; // No change at 0. Doubles swing speed per 200 power.
+
         if (attacker.hasSpellEffect(Enchants.CRET_KARMASLOW)) {
             calcspeed *= 2.0f; //Karma Slow
         }

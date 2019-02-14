@@ -5,13 +5,13 @@ version "1.2"
 
 repositories {
     mavenCentral()
-    maven { url "http://gotti.no-ip.org/maven/repository" }
+    maven { url "https://dl.bdew.net/agorepo/" }
     maven { url 'https://jitpack.io' }
 }
 
 dependencies {
-    compile 'org.gotti.wurmunlimited:server-modlauncher:0.39-beta1'
-    compile 'com.github.Sindusk:sindusklibrary:v1.5'
+    compile 'org.gotti.wurmunlimited:server-modlauncher:0.40'
+    compile 'com.github.Sindusk:sindusklibrary:v2.0'
 }
 
 jar {

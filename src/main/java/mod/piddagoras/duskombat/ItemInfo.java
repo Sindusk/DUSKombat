@@ -38,8 +38,8 @@ public class ItemInfo {
             if(target.isWeapon()) {
                 // Weapon damage, speed, and DPS
                 double baseDamage = DamageMethods.getBaseWeaponDamage(performer, null, target, true);
-                double frostbrandDamage = baseDamage * target.getSpellFrostDamageBonus() * 0.0033d; // 0.33% damage per power
-                double flamingAuraDamage = baseDamage * target.getSpellDamageBonus() * 0.0033d; // 0.33% damage per power
+                double frostbrandDamage = baseDamage * target.getSpellFrostDamageBonus() * 0.0030d; // 0.30% damage per power
+                double flamingAuraDamage = baseDamage * target.getSpellDamageBonus() * 0.0030d; // 0.30% damage per power
                 byte elementalColor = COLOR_RED;
                 if(frostbrandDamage > flamingAuraDamage){
                     elementalColor = COLOR_BLUE;
@@ -131,6 +131,12 @@ public class ItemInfo {
                 segments.clear();
                 segments.add(new MulticolorLineSegment("Other: ", COLOR_FORESTGREEN));
                 segments.add(new MulticolorLineSegment(String.format("%.1f%% DR, %.1f%% Glance", (1f-averageOtherRed)*100f, averageOtherGlance*100f), COLOR_WHITE));
+                comm.sendColoredMessageEvent(segments);
+
+                ArmourTemplate armourTemplate = ArmourTemplate.getArmourTemplate(target);
+                segments.clear();
+                segments.add(new MulticolorLineSegment("Movement Penalty: ", COLOR_FORESTGREEN));
+                segments.add(new MulticolorLineSegment(String.format("%.2f%%", armourTemplate.getMoveModifier()*ArmourTemplate.getMaterialMovementModifier(target.getMaterial())*100f), COLOR_WHITE));
                 comm.sendColoredMessageEvent(segments);
             }
         }

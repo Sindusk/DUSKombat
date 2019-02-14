@@ -68,7 +68,12 @@ public class CombatMethods {
             bonus += attacker.getCRCounterBonus() * 10;
         }
 
-        double hitCheck = primWeaponSkill.skillCheck(5, weapon, bonus, noSkillGain, 10.0f);
+        double check = 5;
+        if (opponent.getBaseCombatRating() > 50){
+            check += opponent.getBodyControl()*0.1f;
+        }
+
+        double hitCheck = primWeaponSkill.skillCheck(check, weapon, bonus, noSkillGain, 10.0f);
 
         if(attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT) > 0){
             hitCheck += attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT)*0.05d;
