@@ -171,11 +171,13 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
                     CtClass.floatType,
                     CtClass.floatType,
                     CtClass.booleanType,
+                    CtClass.booleanType,
+                    CtClass.booleanType,
                     CtClass.booleanType
             };
             String desc1 = Descriptor.ofMethod(CtClass.booleanType, params1);
             replace = "{" +
-                    " return "+DamageEngine.class.getName()+".addWound($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, null, false, false);" +
+                    " return "+DamageEngine.class.getName()+".addWound($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, null, false, false);" +
                     "}";
             Util.setBodyDescribed(thisClass, ctCombatEngine, "addWound", desc1, replace);
 

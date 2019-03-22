@@ -79,7 +79,7 @@ public class CombatMethods {
             hitCheck += attacker.getBonusForSpellEffect(Enchants.CRET_TRUEHIT)*0.05d;
         }
         if(weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS) > 0){
-            hitCheck += weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.05d;
+            hitCheck += weapon.getBonusForSpellEffect(Enchants.BUFF_NIMBLENESS)*0.07d;
         }
 
         if(Weapon.getSkillPenaltyForWeapon(weapon) > 0){

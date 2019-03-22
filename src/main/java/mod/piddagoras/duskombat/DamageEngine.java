@@ -41,7 +41,7 @@ public class DamageEngine {
         }
     }
 
-    public static boolean addWound(Creature performer, Creature defender, byte type, int pos, double damage, float armourMod, String attString, Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist, Item weapon, boolean critical, boolean glance) {
+    public static boolean addWound(Creature performer, Creature defender, byte type, int pos, double damage, float armourMod, String attString, Battle battle, float infection, float poison, boolean archery, boolean alreadyCalculatedResist, boolean noMinimumDamage, boolean spell, Item weapon, boolean critical, boolean glance) {
         // Debug message
         /*String perfName = "VOID";
         String defName = "VOID";
@@ -106,7 +106,7 @@ public class DamageEngine {
             }
 
             // Apply resistances/vulnerabilities
-            damage *= Wound.getResistModifier(defender, type);
+            damage *= Wound.getResistModifier(performer, defender, type);
         }
 
         boolean dead = false;
@@ -147,14 +147,14 @@ public class DamageEngine {
                 if (wound.getHealEff() > 0 && Server.rand.nextInt(2) == 0) { // 50% chance to remove healing covers
                     wound.setHealeff((byte)0);
                 }
-                dead = wound.modifySeverity((int)(damage * armourMod), performer != null && (performer.isPlayer() || performer.isDominated()));
+                dead = wound.modifySeverity((int)(damage * armourMod), performer != null && (performer.isPlayer() || performer.isDominated()), spell);
                 foundWound = true;
             }
             else {
                 if (!defender.isPlayer()) {
-                    wound = new TempWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection);
+                    wound = new TempWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection, spell);
                 } else {
-                    wound = new DbWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection, performer != null && performer.isPlayer());
+                    wound = new DbWound(type, (byte)pos, (float)damage * armourMod, defender.getWurmId(), poison, infection, performer != null && performer.isPlayer(), spell);
                 }
                 defender.setWounded();
             }
@@ -209,7 +209,7 @@ public class DamageEngine {
         return dead;
     }
 
-    public static boolean addFireWound(Creature performer, Creature defender, int pos, double damage, float armourMod) {
+    public static boolean addFireWound(Creature performer, Creature defender, int pos, double damage, float armourMod, boolean spell) {
         if(defender == null){
             logger.severe("Called addWound with a null defender.");
             return false;
@@ -252,7 +252,7 @@ public class DamageEngine {
                 if (wound.getType() == Wound.TYPE_COLD) {
                     defender.setWounded();
                     wound.setBandaged(false);
-                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer());
+                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer(), spell);
                     foundWound = true;
                 } else {
                     wound = null;
@@ -260,8 +260,8 @@ public class DamageEngine {
             }
             if (wound == null) {
                 wound = WurmId.getType(defender.getWurmId()) == 1
-                        ? new TempWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f)
-                        : new DbWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null ? performer.isPlayer() : false);
+                        ? new TempWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, spell)
+                        : new DbWound(Wound.TYPE_BURN, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null && performer.isPlayer(), spell);
             }
             if (!foundWound) {
                 dead = defender.getBody().addWound(wound);
@@ -270,7 +270,7 @@ public class DamageEngine {
         return dead;
     }
 
-    public static boolean addColdWound(Creature performer, Creature defender, int pos, double damage, float armourMod) {
+    public static boolean addColdWound(Creature performer, Creature defender, int pos, double damage, float armourMod, boolean spell) {
         if(defender == null){
             logger.severe("Called addWound with a null defender.");
             return false;
@@ -314,7 +314,7 @@ public class DamageEngine {
                 if (wound.getType() == Wound.TYPE_COLD) {
                     defender.setWounded();
                     wound.setBandaged(false);
-                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer());
+                    dead = wound.modifySeverity((int)(damage * (double)armourMod), performer != null && performer.isPlayer(), spell);
                     foundWound = true;
                 } else {
                     wound = null;
@@ -322,8 +322,8 @@ public class DamageEngine {
             }
             if (wound == null) {
                 wound = WurmId.getType(defender.getWurmId()) == 1
-                        ? new TempWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f)
-                        : new DbWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null && performer.isPlayer());
+                        ? new TempWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, spell)
+                        : new DbWound(Wound.TYPE_COLD, (byte)pos, (float)damage * armourMod, defender.getWurmId(), 0.0f, 0.0f, performer != null && performer.isPlayer(), spell);
             }
             if (!foundWound) {
                 dead = defender.getBody().addWound(wound);

@@ -147,8 +147,8 @@ public class DamageMethods {
         } else if (attacker.getCultist() != null && attacker.getCultist().doubleWarDamage()) {
             mult *= 1.5D; // 50% extra damage if under the effects of hate war bonus.
             //mildStack = true;
-        } else if (attacker.getDeity() != null && attacker.getDeity().warrior && attacker.getFaith() >= 40.0F && attacker.getFavor() >= 20.0F) {
-            mult *= 1.25D; // 25% extra damage if following a warrior god with over 40 faith and 20 favor.
+        } else if (attacker.getDeity() != null && attacker.getDeity().isWarrior() && attacker.getFaith() >= 40.0F && attacker.getFavor() >= 20.0F) {
+            mult *= 1.15D; // 15% extra damage if following a warrior god with over 40 faith and 20 favor.
             //mildStack = true;
         }
 

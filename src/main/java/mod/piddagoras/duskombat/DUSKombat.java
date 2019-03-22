@@ -19,6 +19,7 @@ import com.wurmonline.server.skills.SkillList;
 import com.wurmonline.server.skills.Skills;
 import com.wurmonline.server.sounds.SoundPlayer;
 import com.wurmonline.server.spells.SpellEffect;
+import com.wurmonline.server.spells.SpellResist;
 import com.wurmonline.server.utils.CreatureLineSegment;
 import com.wurmonline.shared.constants.BodyPartConstants;
 import com.wurmonline.shared.constants.Enchants;
@@ -924,7 +925,7 @@ public class DUSKombat {
 
             // Deal the initial wound
             //dead = CombatEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false);
-            dead = DamageEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false, false, attWeapon, critical, glance);
+            dead = DamageEngine.addWound(creature, defender, woundType, position, defdamage, armourMod, attString, battle, Server.rand.nextInt((int)Math.max(1.0f, attWeapon.getWeaponSpellDamageBonus())), poisdam, false, false, true, false, attWeapon, critical, glance);
 
             // BONK! achievement check
             if (attWeapon.isWeaponCrush() && attWeapon.getWeightGrams() > 4000 && armour != null && armour.getTemplateId() == ItemList.helmetGreat) {
@@ -935,15 +936,30 @@ public class DUSKombat {
             if(creature.getBody() != null && creature.getBody().getWounds() != null && creature.getBody().getWounds().getWounds() != null) { // Ensure wounds are initialized
                 Wound[] w = creature.getBody().getWounds().getWounds();
                 if(w.length > 0) { // Ensure the player has at least one wound.
-                    float lifeTransferPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellLifeTransferModifier());
+                    float lifeTransferPower = Math.min(DUSKombatMod.getCombatEnchantCap(), Math.max(attWeapon.getSpellLifeTransferModifier(), attWeapon.getSpellEssenceDrainModifier() / 3.0F));
                     if(lifeTransferPower > 0) {
                         float lifeTransferChampMod = creature.isChampion() ? 500.0f : 250.0f;
                         if(creature.getCultist() != null && creature.getCultist().healsFaster()){
                             lifeTransferChampMod *= 0.5f;
                         }
+
                         float lifeTransferDamageHealed = ((float) defdamage) * armourMod * lifeTransferPower / lifeTransferChampMod;
+
+                        // Calculate resistance effects
+                        double resistance = SpellResist.getSpellResistance(creature, Actions.SPELL_ITEMBUFF_LIFETRANSFER);
+                        lifeTransferDamageHealed *= resistance;
+
                         if (DamageMethods.canDealDamage(lifeTransferDamageHealed, armourMod)) {
-                            byte type = w[0].getType();
+                            Wound targetWound = w[0];
+                            int var29 = w.length;
+
+                            for (Wound wound : w) {
+                                if (wound.getSeverity() > targetWound.getSeverity()) {
+                                    targetWound = wound;
+                                }
+                            }
+
+                            byte type = targetWound.getType();
                             if(type == Wound.TYPE_BURN || type == Wound.TYPE_COLD || type == Wound.TYPE_ACID){ // Elemental wounds heal 50% slower
                                 lifeTransferDamageHealed *= 0.5f;
                             }else if(type == Wound.TYPE_INTERNAL || type == Wound.TYPE_INFECTION || type == Wound.TYPE_POISON || type == Wound.TYPE_WATER){ // External wounds heal 70% slower
@@ -953,7 +969,9 @@ public class DUSKombat {
                             if(Servers.localServer.PVPSERVER && (defender.isDominated() || defender.isPlayer()) && creature.isPlayer()){
                                 lifeTransferDamageHealed *= 0.5f;
                             }
-                            w[0].modifySeverity((int) -lifeTransferDamageHealed);
+
+                            SpellResist.addSpellResistance(creature, Actions.SPELL_ITEMBUFF_LIFETRANSFER, Math.min((double)targetWound.getSeverity(), lifeTransferDamageHealed));
+                            targetWound.modifySeverity(-((int)lifeTransferDamageHealed));
                         }
                     }
                 }
@@ -982,7 +1000,7 @@ public class DUSKombat {
                 if (!dead && DamageMethods.canDealDamage(flamingAuraDamage, armourMod)) {
                     //dead = DamageEngine.addWound(creature, defender, Wound.TYPE_BURN, position, flamingAuraDamage, armourMod, "ignite", battle, 0, 0, false, false);
                     //dead = defender.addWoundOfType(creature, Wound.TYPE_BURN, position, false, armourMod, false, flamingAuraDamage);
-                    dead = DamageEngine.addFireWound(creature, defender, position, flamingAuraDamage, armourMod);
+                    dead = DamageEngine.addFireWound(creature, defender, position, flamingAuraDamage, armourMod, true);
                 }
             }
 
@@ -992,7 +1010,7 @@ public class DUSKombat {
                 double frostbrandDamage = defdamage * frostbrandPower * 0.003d; // 0.30% damage per power
                 if (!dead && DamageMethods.canDealDamage(frostbrandDamage, armourMod)) {
                     //dead = defender.addWoundOfType(creature, Wound.TYPE_COLD, position, false, armourMod, false, frostbrandDamage);
-                    dead = DamageEngine.addColdWound(creature, defender, position, frostbrandDamage, armourMod);
+                    dead = DamageEngine.addColdWound(creature, defender, position, frostbrandDamage, armourMod, true);
                 }
             }
 
@@ -1002,7 +1020,7 @@ public class DUSKombat {
                 double materialDamage = defdamage * materialDamagePower; // Damage modifier is calculated in
                 if (!dead && DamageMethods.canDealDamage(materialDamage, armourMod)) {
                     byte materialDamageType = Weapon.getMaterialExtraWoundType(attWeapon.getMaterial());
-                    dead = defender.addWoundOfType(creature, materialDamageType, position, false, armourMod, false, materialDamage);
+                    dead = defender.addWoundOfType(creature, materialDamageType, position, false, armourMod, false, materialDamage, 0f, 0f, true, false);
                 }
             }
 
@@ -1017,7 +1035,7 @@ public class DUSKombat {
                 if (creature.isUnique()) { // Uniques ignore effects of AOSP/Thornshell always.
                     CombatMessages.sendBounceWoundIgnoreMessages(creature, defender, bounceWoundName);
                 }else if (DamageMethods.canDealDamage(bounceDamage, spellResist)) { // Doesn't use "dead" because affecting attacker
-                    CombatEngine.addBounceWound(defender, creature, woundType, position, bounceDamage, armourMod);
+                    CombatEngine.addBounceWound(defender, creature, woundType, position, bounceDamage, armourMod, 0f, 0f, true, true);
                 }
             }
 
@@ -1161,7 +1179,7 @@ public class DUSKombat {
                 }
             }
             if (!defender.isFriendlyKingdom(performer.getKingdomId()) && !Players.getInstance().isOverKilling(performer.getWurmId(), defender.getWurmId())) {
-                if (performer.getKingdomTemplateId() == 3 || performer.getDeity() != null && performer.getDeity().hateGod) {
+                if (performer.getKingdomTemplateId() == 3 || performer.getDeity() != null && performer.getDeity().isHateGod()) {
                     performer.maybeModifyAlignment(-5.0f);
                 } else {
                     performer.maybeModifyAlignment(5.0f);
