@@ -20,6 +20,9 @@ public class DUSKombatMod
 implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListener, ServerStartedListener, ServerPollListener {
 	public static Logger logger = Logger.getLogger(DUSKombatMod.class.getName());
 
+	// Global toggle to completely disable the mod if its features are unwanted.
+	public static boolean enableDUSKombat = true;
+
 	public static float minimumSwingTimer = 3.0f;
 	public static boolean useEpicBloodthirst = true;
 	public static boolean showItemCombatInformation = true;
@@ -59,6 +62,7 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 		Prop.properties = properties;
 
 		// Base Configuration
+        enableDUSKombat = Prop.getBooleanProperty("enableDUSKombat", enableDUSKombat);
 		minimumSwingTimer = Prop.getFloatProperty("minimumSwingTimer", minimumSwingTimer);
 		useEpicBloodthirst = Prop.getBooleanProperty("useEpicBloodthirst", useEpicBloodthirst);
 		showItemCombatInformation = Prop.getBooleanProperty("showItemCombatInformation", showItemCombatInformation);
@@ -103,6 +107,10 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
             }
         }
         // Print values of configuration
+        logger.info("Enable DUSKombat: "+enableDUSKombat);
+        if (!enableDUSKombat){
+            return;
+        }
         logger.info(" -- Mod Configuration -- ");
     	logger.info(String.format("Minimum Swing Timer: %.2f seconds", minimumSwingTimer));
     	logger.info(String.format("Use Epic Bloodthirst: %s", useEpicBloodthirst));
@@ -120,6 +128,9 @@ implements WurmServerMod, Configurable, PreInitable, ItemTemplatesCreatedListene
 
 	@Override
 	public void preInit(){
+        if (!enableDUSKombat){
+            return;
+        }
 		logger.info("Beginning preInit...");
         try{
             ClassPool classPool = HookManager.getInstance().getClassPool();

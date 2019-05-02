@@ -1,7 +1,11 @@
 package mod.piddagoras.duskombat;
 
+import com.wurmonline.mesh.MeshIO;
+import com.wurmonline.mesh.Tiles;
 import com.wurmonline.server.Items;
 import com.wurmonline.server.NoSuchItemException;
+import com.wurmonline.server.Server;
+import com.wurmonline.server.behaviours.Terraforming;
 import com.wurmonline.server.combat.CombatEngine;
 import com.wurmonline.server.combat.Weapon;
 import com.wurmonline.server.creatures.Creature;
@@ -71,6 +75,39 @@ public class CombatMethods {
         double check = 5;
         if (opponent.getBaseCombatRating() > 50){
             check += opponent.getBodyControl()*0.1f;
+        }
+
+        Tiles.Tile theTile;
+        if (attacker.getDeity() != null && attacker.getFaith() > 70.0F) {
+            MeshIO mesh = Server.surfaceMesh;
+            if (attacker.getLayer() < 0) {
+                mesh = Server.caveMesh;
+            }
+
+            int tile = mesh.getTile(attacker.getCurrentTile().getTileX(), attacker.getCurrentTile().getTileY());
+            byte type = Tiles.decodeType(tile);
+            // Fo gets a -2.5 check on natural land.
+            if (attacker.getDeity().isFo()) {
+                theTile = Tiles.getTile(type);
+                if (theTile.isNormalTree() || theTile.isMyceliumTree() || type == Tiles.Tile.TILE_GRASS.id || type == Tiles.Tile.TILE_FIELD.id || type == Tiles.Tile.TILE_FIELD2.id || type == Tiles.Tile.TILE_DIRT.id || type == Tiles.Tile.TILE_TUNDRA.id) {
+                    check -= 2.5f;
+                }
+            }
+
+            // Magranon and Libila get a -5 check at all times.
+            if ((attacker.getDeity().isMagranon() || attacker.getDeity().isLibila())) {
+                check -= 5f;
+            }
+
+            // Vynora gets a -2.5 check at sea and on road.
+            if (attacker.getDeity().isVynora()) {
+                short height = Tiles.decodeHeight(tile);
+                if (height < 0) {
+                    check -= 2.5f;
+                } else if (Terraforming.isRoad(type)) {
+                    check -= 2.5f;
+                }
+            }
         }
 
         double hitCheck = primWeaponSkill.skillCheck(check, weapon, bonus, noSkillGain, 10.0f);

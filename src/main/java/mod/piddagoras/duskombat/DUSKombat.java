@@ -711,8 +711,18 @@ public class DUSKombat {
                 woundType = Wound.TYPE_BURN;
             }else if(weapon.enchantment == Enchants.FROST_DAM){ // Salve of frost
                 woundType = Wound.TYPE_COLD;
-            }else if(weapon.getSpellVenomBonus() > 0){ // Venom
-                woundType = Wound.TYPE_POISON;
+            }
+        }
+
+        if (weapon.getSpellVenomBonus() > 0) {
+            woundType = Wound.TYPE_POISON;
+        }
+
+        // Check for Bloodthirst wound
+        if (weapon.getSpellExtraDamageBonus() > 0.0F) {
+            float bloodthirstPower = weapon.getSpellExtraDamageBonus();
+            if (Server.rand.nextFloat() * 100000.0F <= bloodthirstPower) {
+                woundType = Wound.TYPE_INFECTION;
             }
         }
         //logger.info(String.format("Setting %s's attack damage type to %s (%s).", attacker.getName(), woundType, WoundAssist.getWoundName(woundType)));
@@ -1011,6 +1021,15 @@ public class DUSKombat {
                 if (!dead && DamageMethods.canDealDamage(frostbrandDamage, armourMod)) {
                     //dead = defender.addWoundOfType(creature, Wound.TYPE_COLD, position, false, armourMod, false, frostbrandDamage);
                     dead = DamageEngine.addColdWound(creature, defender, position, frostbrandDamage, armourMod, true);
+                }
+            }
+
+            // Essence Drain wound
+            float essenceDrainPower = Math.min(DUSKombatMod.getCombatEnchantCap(), attWeapon.getSpellEssenceDrainModifier());
+            if (essenceDrainPower > 0) {
+                double essenceDrainDamage = defdamage * essenceDrainPower * 0.001d; // 0.10% damage per power
+                if (!dead && DamageMethods.canDealDamage(essenceDrainDamage, armourMod)) {
+                    dead = defender.addWoundOfType(creature, (byte) 9, position, false, armourMod, false, (double) (attWeapon.getSpellEssenceDrainModifier() / 1000.0F) * defdamage, 0.0F, 0.0F, true, true);
                 }
             }
 
